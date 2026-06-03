@@ -2151,6 +2151,7 @@ async function autoFetchOnStartup() {
         renderListe();
         renderEditor();
         updateSidebar();
+        updateKlasmanFilter();
         renderDashboard();
         showStartupBanner(`✅ ${klasmanlar.length} klasman Sheets'ten otomatik yüklendi!`, 'success');
         console.log('✅ Otomatik yükleme tamamlandı:', klasmanlar.length, 'klasman');
@@ -2363,6 +2364,7 @@ async function _firstRunSync() {
       renderListe();
       renderEditor();
       updateSidebar();
+      updateKlasmanFilter();
       renderDashboard();
       showStartupBanner(`✅ ${klasmanlar.length} klasman senkronize edildi!`, 'success');
     } else {
@@ -2473,7 +2475,8 @@ async function pullFromSheets() {
       renderListe();
       renderEditor();
       updateSidebar();
-      renderDashboard();
+      updateKlasmanFilter();   // dashboard klasman filtresi dropdown'ı güncelle
+      renderDashboard();       // inspector kartlarını yeniden çiz
       showSuccessMessage(`✅ ${count} klasman Google Sheets'ten çekildi!`);
     } else {
       alert('❌ Geçersiz veri formatı döndü.\nApps Script doğru yapılandırıldı mı?');
@@ -2969,16 +2972,18 @@ function renderDashboard() {
 
 function updateKlasmanFilter() {
   const klasmanSet = new Set();
+  // performansData'daki klasmanlardan
   performansData.forEach(inspector => {
-    Object.keys(inspector.klasmanlar).forEach(klasman => {
-      klasmanSet.add(klasman);
-    });
+    Object.keys(inspector.klasmanlar || {}).forEach(k => klasmanSet.add(k));
   });
-  
+  // Sheets'ten çekilen klasmanlar dizisinden (performansData boş olsa bile dolar)
+  klasmanlar.forEach(k => { if (k.ad) klasmanSet.add(k.ad); });
+
   const select = document.getElementById('klasman-filter');
+  const prev = select.value;
   select.innerHTML = '<option value="">Tüm Klasmanlar</option>';
-  Array.from(klasmanSet).sort().forEach(klasman => {
-    select.innerHTML += `<option value="${klasman}">${klasman}</option>`;
+  Array.from(klasmanSet).sort().forEach(k => {
+    select.innerHTML += `<option value="${k}"${k === prev ? ' selected' : ''}>${k}</option>`;
   });
 }
 
