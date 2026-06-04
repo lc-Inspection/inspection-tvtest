@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspection Performans Paneli</title>
+<title> Inspection Performans Paneli</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -966,7 +966,7 @@ label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; 
     <div class="topbar-logo">LC</div>
     <div class="topbar-title">
       Inspection Performans
-      <small>Kalite Kontrol</small>
+      <small>Inspection Kontrol</small>
     </div>
   </div>
   <div class="topbar-right">
@@ -1452,7 +1452,7 @@ label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; 
             <div class="slideshow-logo">
               <div class="slideshow-logo-icon">LC</div>
               <div class="slideshow-logo-text">
-                <div>INSPECTION</div>
+                <div>Inspection</div>
                 <div>Inspection Performance</div>
               </div>
             </div>
@@ -2293,7 +2293,7 @@ SHEET_NAME = 'Klasmanlar'      ← Sekme adı (değiştirmeye gerek yok)</div>
           <ol style="font-size:11px;color:var(--muted);line-height:2;padding-left:18px">
             <li>Apps Script editöründe: <strong>Dağıt → Yeni Dağıtım</strong></li>
             <li>Tür: <strong>Web uygulaması</strong></li>
-            <li>Açıklama: <em> Klasman Sync v1</em></li>
+            <li>Açıklama: <em>Ürün Klasman Sync v1</em></li>
             <li>Farklı çalıştır: <strong>Ben (hesabınız)</strong></li>
             <li>Erişimi olan: <strong>Herkes</strong></li>
             <li><strong>Dağıt</strong>'a tıklayın → Google hesabı izni isteyecek, onaylayın</li>
@@ -2975,12 +2975,14 @@ function renderInspectorCards() {
             </div>
           </div>
           <div style="text-align:center">
-            <div class="circular-progress" style="--progress-angle: ${progressAngle}deg; --progress-color: ${progressColor};">
-              <div class="circular-progress-text ${performansClass}">${performansText}</div>
+            <div style="position:relative;display:inline-block">
+              <div class="circular-progress" style="--progress-angle: ${progressAngle}deg; --progress-color: ${progressColor};">
+                <div class="circular-progress-text ${performansClass}">${performansText}</div>
+              </div>
+              ${currentHedef !== 100 ? `<div style="position:absolute;top:-6px;right:-6px;background:var(--amber);color:#fff;font-size:8px;font-weight:700;padding:2px 5px;border-radius:8px;line-height:1.2">H%${currentHedef}</div>` : ''}
             </div>
-            <div style="font-size:9px;color:var(--muted2);margin-top:4px;font-weight:600">⚡ Düz. Performans</div>
-            <div style="font-size:8px;color:var(--amber);margin-top:1px;font-weight:600">Hedef %${currentHedef}</div>
-            <div style="font-size:8px;color:var(--muted2);margin-top:1px">${performansSeviyesi}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Düz. Performans</div>
+            <div style="font-size:9px;color:${progressColor};font-weight:600;margin-top:1px">${performansSeviyesi}</div>
           </div>
         </div>
 
@@ -3147,7 +3149,9 @@ function showInspectorDetail(inspectorName) {
   const toplamAdet   = tumKayitlar.reduce((s,k) => s + k.adet, 0);
   const toplamStandart = tumKayitlar.reduce((s,k) => s + k.standartSure, 0);
   const toplamFiili  = tumKayitlar.reduce((s,k) => s + k.kayitFiiliSure, 0);
-  const totalPerf    = inspector.genelHizPerf ?? 0;
+  const hamPerf      = inspector.genelHizPerf ?? 0;
+  const currentHedefModal = Math.max(1, parseFloat(document.getElementById('inp-verimlilik')?.value) || 100);
+  const totalPerf    = Math.round(hamPerf * (100 / currentHedefModal));
   const totalMesai   = inspector.mesaiSure || 0;
 
   // Renk sınıfı
@@ -3267,7 +3271,7 @@ function showInspectorDetail(inspectorName) {
         ['⏱','STANDART SÜRE',fmtSn(toplamStandart),'var(--navy)'],
         ['🕐','GERÇEKLEŞen',toplamFiili>0?fmtSn(toplamFiili):'—',toplamFiili>0?'var(--green)':'var(--muted2)'],
         ['🗓','MESAİ SÜRESİ',fmtSn(totalMesai),'var(--navy)'],
-        ['📊','PERFORMANS',(totalPerf??0)+'%',perfColor(totalPerf)]
+        ['📊','DÜZ. PERFORMANS',(totalPerf??0)+'%',perfColor(totalPerf)]
       ].map(([ic,lb,val,col])=>`
         <div style="background:var(--lblue3);border:1px solid var(--border2);border-radius:10px;padding:12px 8px;text-align:center;">
           <div style="font-size:16px;margin-bottom:2px;">${ic}</div>
@@ -3871,8 +3875,10 @@ function renderPerfTabloFromData(page) {
       </div>`;
     }).join('');
 
-    // Dairesel progress
-    const pAngle = Math.min(360, Math.round((Math.min(performans, 150) / 150) * 360));
+    // Dairesel progress — pastada Düz. Performans gösterilir
+    const displayPerf = vPerfDisplay !== null ? vPerfDisplay : performans;
+    const displayCm   = vPerfDisplay !== null ? vcm : cm;
+    const pAngle = Math.min(360, Math.round((Math.min(displayPerf, 150) / 150) * 360));
 
     return `
     <div style="background:${cm.bg};border:1.5px solid ${cm.accent}28;border-radius:14px;
@@ -3904,21 +3910,19 @@ function renderPerfTabloFromData(page) {
               padding:2px 7px;border-radius:8px;letter-spacing:.4px;">${cm.label}</span>
           </div>
         </div>
-        <!-- Mini performans daire -->
+        <!-- Mini performans daire — sadece Düz. Performans -->
         <div style="flex-shrink:0;text-align:center;">
           <div style="width:64px;height:64px;border-radius:50%;
-            background:conic-gradient(${cm.accent} ${pAngle}deg, #e2ecf8 0deg);
+            background:conic-gradient(${displayCm.accent} ${pAngle}deg, #e2ecf8 0deg);
             display:flex;align-items:center;justify-content:center;
-            box-shadow:0 2px 10px ${cm.accent}2A;">
+            box-shadow:0 2px 10px ${displayCm.accent}2A;">
             <div style="width:46px;height:46px;border-radius:50%;background:#fff;
               display:flex;flex-direction:column;align-items:center;justify-content:center;
               box-shadow:inset 0 1px 3px rgba(0,0,0,.07);">
-              <div style="font-size:13px;font-weight:800;color:${cm.accent};font-family:'DM Mono',monospace;line-height:1;">${performans}%</div>
+              <div style="font-size:13px;font-weight:800;color:${displayCm.accent};font-family:'DM Mono',monospace;line-height:1;">${displayPerf}%</div>
               <div style="font-size:7px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;">perf</div>
             </div>
           </div>
-          ${hedef !== 100 && vPerfDisplay !== null ? `
-          <div style="margin-top:4px;font-size:9px;font-weight:700;color:${vcm.accent};font-family:'DM Mono',monospace;">⚡ ${vPerfDisplay}%</div>` : ''}
         </div>
       </div>
 
@@ -3975,9 +3979,9 @@ function renderPerfTabloFromData(page) {
             <span style="font-size:11px;font-weight:600;background:var(--blue2);color:#fff;padding:3px 10px;border-radius:99px;">${performansData.length} inspector</span>
           </div>
           <div style="font-size:11px;color:var(--muted);margin-top:4px;display:flex;gap:16px;flex-wrap:wrap;">
-            <span>📅 Ort. Performans: <strong style="color:var(--navy)">${ortPerformans}%</strong></span>
+            <span>⚡ Düz. Ort.: <strong style="color:var(--amber)">${ortVPerf}%</strong></span>
+            <span>📅 Ham Ort.: <strong style="color:var(--muted)">${ortPerformans}%</strong></span>
             <span>📆 Ort. Çalışma: <strong style="color:var(--navy)">${ortalamaGun} gün</strong></span>
-            ${hedef !== 100 ? `<span>⚡ Düz. Ort.: <strong style="color:var(--amber)">${ortVPerf}%</strong></span>` : ''}
           </div>
           <div style="font-size:10px;color:var(--green);margin-top:4px;">
             ✅ Standart Süre ÷ (Gün × 7.5s) × 100
@@ -5224,7 +5228,7 @@ const LAST_VERSION_KEY = 'lc_inspection_last_version';
 function checkVersion() {
   const lastVersion = localStorage.getItem(LAST_VERSION_KEY);
   if (lastVersion !== APP_VERSION) {
-    console.log(`🎉 Inspection Panel güncellendi! v${lastVersion || '1.0.0'} → v${APP_VERSION}`);
+    console.log(`🎉  Inspection Panel güncellendi! v${lastVersion || '1.0.0'} → v${APP_VERSION}`);
     localStorage.setItem(LAST_VERSION_KEY, APP_VERSION);
     
     if (lastVersion) {
@@ -5733,7 +5737,7 @@ if (window.location.hostname === 'localhost' || window.location.hostname === '12
 }
 
 // Uygulama hazır
-console.log(`✅ Inspection Performans Paneli v${APP_VERSION} hazır!`);
+console.log(`✅  Inspection Performans Paneli v${APP_VERSION} hazır!`);
 console.log(`📊 ${klasmanlar.length} klasman, ${performansData.length} inspector verisi yüklendi`);
 
 </script>
