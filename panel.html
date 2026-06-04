@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title> Inspection Performans Paneli</title>
+<title>Inspection Performans Paneli</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -965,11 +965,12 @@ label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; 
     <div class="topbar-logo">LC</div>
     <div class="topbar-title">
       Inspection Performans
-      <small> Inspection Kontrol</small>
+      <small>Inspection Kontrol</small>
     </div>
   </div>
   <div class="topbar-right">
     <span class="top-badge" id="klasman-badge">0 klasman</span>
+    <button onclick="showPerformansHowItWorks()" style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;background:#fff;color:var(--navy);border:1px solid rgba(255,255,255,.25);border-radius:99px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:.2px;font-family:'DM Sans',sans-serif;transition:all .15s" onmouseover="this.style.background='#f0f6ff'" onmouseout="this.style.background='#fff'">ℹ️ Nasıl Çalışır</button>
     <span class="top-badge" id="inspector-badge">0 inspector</span>
     <div class="top-clock" id="clock">--:--:--</div>
   </div>
@@ -1257,6 +1258,17 @@ label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; 
         <div class="ph-left">
           <h1>Performans Analizi</h1>
           <p>Excel yükleyin ve inspector bazında performansı ölçün</p>
+        </div>
+        <div class="ph-buttons">
+          <button class="btn" onclick="showPerformansHowItWorks()" title="Hesaplama mantığını öğrenin">
+            ℹ️ Nasıl Çalışır
+          </button>
+          <button class="btn btn-success" onclick="pushPerformansManual(event)" id="perf-push-btn" title="Mevcut performans verilerini Google Sheets'e gönder">
+            📤 Sheets'e Gönder
+          </button>
+          <button class="btn" onclick="pullPerformansFromSheetsManual(event)" id="perf-pull-btn" title="Google Sheets'ten performans verilerini çek">
+            📥 Sheets'ten Çek
+          </button>
         </div>
       </div>
 
@@ -2334,6 +2346,287 @@ SHEET_NAME = 'Klasmanlar'      ← Sekme adı (değiştirmeye gerek yok)</div>
   modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// PERFORMANS ANALİZİ — MANİFEST GÖNDER (manuel buton)
+// ────────────────────────────────────────────────────────────────────────────
+async function pushPerformansManual(ev) {
+  const url   = appConfig.sheetsWebAppUrl;
+  const token = appConfig.sheetsApiToken;
+
+  if (!url || !token) {
+    alert('⚠️ Google Sheets bağlantısı yapılandırılmamış!\n\nKlasman Yönetimi → Bağlantı Ayarları bölümünden\nWeb App URL ve API Token girin.');
+    return;
+  }
+
+  if (!performansData || performansData.length === 0) {
+    alert('⚠️ Gönderilecek performans verisi yok.\nÖnce Excel dosyası yükleyin ve analizi tamamlayın.');
+    return;
+  }
+
+  const btn = document.getElementById('perf-push-btn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.innerHTML = '⏳ Gönderiliyor...'; btn.disabled = true; }
+
+  try {
+    // 1) Okunabilir tablo satırlarını gönder (Sheets'te Performans sekmesi)
+    const rows = performansData.map(row => ({
+      ins: row.ins,
+      adet: row.adet,
+      kayit: row.kayit,
+      gunSayisi: row.gunSayisi || 0,
+      standartSureDk: row.standartSure ? Math.round(row.standartSure / 60) : 0,
+      mesaiSureDk:    row.mesaiSure    ? Math.round(row.mesaiSure / 60)    : 0,
+      genelHizPerf:   row.genelHizPerf,
+      verimlilikPerf: row.verimlilikPerf,
+      hedefVerimlilik: row.hedefVerimlilik || 100,
+      klasmanOzet: Object.entries(row.klasmanlar || {})
+        .map(([k,v]) => `${k}: ${v.adet} adet (${v.hizPerf}%)`)
+        .join(' | ')
+    }));
+
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'setPerformans', token, performans: rows, savedAt: new Date().toISOString() }),
+      mode: 'no-cors'
+    });
+
+    // 2) Ham JSON'u gönder (farklı bilgisayardan çekilebilmesi için)
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'setPerformansRaw', token, performansData, savedAt: new Date().toISOString() }),
+      mode: 'no-cors'
+    });
+
+    showSuccessMessage(`✅ ${performansData.length} inspector verisi Google Sheets'e gönderildi!`);
+  } catch(err) {
+    alert('❌ Gönderme hatası: ' + err.message);
+  } finally {
+    if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// PERFORMANS ANALİZİ — SHEETS'TEN ÇEK (manuel buton)
+// ────────────────────────────────────────────────────────────────────────────
+async function pullPerformansFromSheetsManual(ev) {
+  const url   = appConfig.sheetsWebAppUrl;
+  const token = appConfig.sheetsApiToken;
+
+  if (!url || !token) {
+    alert('⚠️ Google Sheets bağlantısı yapılandırılmamış!\n\nKlasman Yönetimi → Bağlantı Ayarları bölümünden\nWeb App URL ve API Token girin.');
+    return;
+  }
+
+  const btn = document.getElementById('perf-pull-btn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.innerHTML = '⏳ Çekiliyor...'; btn.disabled = true; }
+
+  try {
+    const data = await jsonpFetch(url, { action: 'getPerformansRaw', token });
+
+    if (data.status === 'ok' && Array.isArray(data.performansData) && data.performansData.length > 0) {
+      const count    = data.performansData.length;
+      const savedAt  = data.savedAt ? new Date(data.savedAt).toLocaleString('tr-TR') : '—';
+
+      if (!confirm(`📥 Sheets'te ${count} inspector verisi bulundu.\nSon kayıt: ${savedAt}\n\nMevcut analiz verilerinin üzerine yazılsın mı?`)) {
+        if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+        return;
+      }
+
+      performansData = restorePerformansDateObjects(data.performansData);
+      saveData();
+      renderDashboard();
+      updateSidebar();
+      renderTopInspectors();
+      // Analiz tablosunu yeniden çiz
+      if (typeof renderPerformansTable === 'function') renderPerformansTable();
+      showSuccessMessage(`✅ ${count} inspector verisi Sheets'ten Performans Analizi'ne yüklendi!`);
+    } else {
+      const detay = data.status !== 'ok'
+        ? ` (Durum: ${data.status || 'bilinmiyor'})`
+        : (Array.isArray(data.performansData) ? ` (${data.performansData.length} kayıt)` : ' (veri alanı yok)');
+      alert('ℹ️ Sheets\'te henüz performans verisi bulunamadı.' + detay + '\n\nÖnce bir bilgisayardan Excel yükleyip "📤 Sheets\'e Gönder" butonunu kullanın.');
+    }
+  } catch(err) {
+    alert('❌ Veri çekilemedi: ' + err.message + '\n\n🔧 Kontrol listesi:\n• Web App URL doğru mu?\n• API Token eşleşiyor mu?\n• Apps Script "Erişimi olan: Herkes" seçili mi?');
+  } finally {
+    if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// PERFORMANS ANALİZİ — NASIL ÇALIŞIR MODALI
+// ────────────────────────────────────────────────────────────────────────────
+function showPerformansHowItWorks() {
+  // Mevcut ortalama göster
+  const toplamInsp = performansData.length;
+  const ortPerf    = toplamInsp > 0
+    ? Math.round(performansData.reduce((s, r) => s + (r.genelHizPerf || 0), 0) / toplamInsp)
+    : null;
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(11,31,58,.72);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:28px 32px;width:min(92vw,780px);max-height:88vh;overflow-y:auto;box-shadow:0 24px 60px rgba(11,31,58,.35);border:1px solid var(--border2)">
+
+      <!-- Başlık -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+        <div>
+          <h2 style="font-size:19px;font-weight:700;color:var(--navy);margin-bottom:4px">📊 Performans Analizi — Nasıl Çalışır?</h2>
+          <p style="font-size:12px;color:var(--muted)">Hesaplama mantığı, formüller ve Google Sheets entegrasyonu</p>
+        </div>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="width:34px;height:34px;border:1px solid var(--border);background:var(--offwhite);border-radius:8px;cursor:pointer;font-size:17px;flex-shrink:0">✕</button>
+      </div>
+
+      ${toplamInsp > 0 ? `
+      <!-- Anlık Özet -->
+      <div style="background:linear-gradient(135deg,var(--navy) 0%,var(--blue) 100%);border-radius:12px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:18px;color:#fff">
+        <div style="font-size:32px">📈</div>
+        <div style="flex:1">
+          <div style="font-size:12px;color:rgba(255,255,255,.65);margin-bottom:2px">Şu anki analiz</div>
+          <div style="font-size:15px;font-weight:700">${toplamInsp} inspector · Ort. Hız Performansı: <span style="color:#90CAF9;font-family:'DM Mono',monospace">${ortPerf}%</span></div>
+        </div>
+      </div>` : ''}
+
+      <div style="display:flex;flex-direction:column;gap:14px">
+
+        <!-- 1 - Veri akışı -->
+        <div style="background:var(--lblue3);border:1px solid var(--lblue);border-radius:10px;padding:14px 16px">
+          <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📂 1 — Veri Akışı</div>
+          <ol style="font-size:12px;color:var(--muted);line-height:2.1;padding-left:18px;margin:0">
+            <li>Excel dosyanızı <strong>Dosya Yükle</strong> alanına sürükleyin (.xlsx / .xls)</li>
+            <li><strong>Sütun Eşleme</strong> panelinde doğru kolonları seçin (Klasman, Inspector, Adet, Tarihler)</li>
+            <li>Tablo anında hesaplanır — her satır bir inspectörün bir klasmandaki kaydıdır</li>
+            <li>İstersen <strong>📤 Sheets'e Gönder</strong> ile sonuçları buluta kaydet</li>
+          </ol>
+        </div>
+
+        <!-- 2 - Temel hesaplamalar -->
+        <div style="background:var(--lgreen);border:1px solid #B2DFDB;border-radius:10px;padding:14px 16px">
+          <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">⚙️ 2 — Temel Hesaplamalar</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+
+            <div style="background:#fff;border:1px solid #B2DFDB;border-radius:8px;padding:11px 13px">
+              <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px">🕐 Standart Süre (sn)</div>
+              <code style="font-size:10px;background:var(--offwhite);padding:4px 7px;border-radius:4px;display:block;color:var(--navy);line-height:1.8">
+                Klasman → istasyon süreleri toplamı<br>
+                × BakilacakMiktar (adet)
+              </code>
+              <div style="font-size:10px;color:var(--muted);margin-top:6px">Bir inspektörün o miktarı <em>standart hızda</em> incelemesi için gereken teorik süre.</div>
+            </div>
+
+            <div style="background:#fff;border:1px solid #B2DFDB;border-radius:8px;padding:11px 13px">
+              <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px">⏱ Fiili/Mesai Süresi (sn)</div>
+              <code style="font-size:10px;background:var(--offwhite);padding:4px 7px;border-radius:4px;display:block;color:var(--navy);line-height:1.8">
+                Mesai sütunu varsa → sütun değeri<br>
+                Yoksa → Gün Sayısı × 7.5 saat
+              </code>
+              <div style="font-size:10px;color:var(--muted);margin-top:6px">İnspektörün fiilen harcadığı (veya harcaması gereken) çalışma süresi.</div>
+            </div>
+
+            <div style="background:#fff;border:1px solid #B2DFDB;border-radius:8px;padding:11px 13px">
+              <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px">🏎 Hız Performansı (%)</div>
+              <code style="font-size:10px;background:var(--offwhite);padding:4px 7px;border-radius:4px;display:block;color:var(--navy);line-height:1.8">
+                (Standart Süre ÷ Mesai Süresi) × 100
+              </code>
+              <div style="font-size:10px;color:var(--muted);margin-top:6px">%100 = tam standart hızda çalıştı · %120 = standarttan %20 hızlı · %80 = %20 yavaş.</div>
+            </div>
+
+            <div style="background:#fff;border:1px solid #B2DFDB;border-radius:8px;padding:11px 13px">
+              <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px">⚡ Verimlilik Performansı (%)</div>
+              <code style="font-size:10px;background:var(--offwhite);padding:4px 7px;border-radius:4px;display:block;color:var(--navy);line-height:1.8">
+                Hız Perf × (100 ÷ Hedef%)
+              </code>
+              <div style="font-size:10px;color:var(--muted);margin-top:6px">Hedef verimlilik %100'den farklıysa düzeltme katsayısı uygulanır.</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 3 - Gün sayısı -->
+        <div style="background:var(--lamber);border:1px solid #FFE082;border-radius:10px;padding:14px 16px">
+          <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">📅 3 — Çalışma Gün Sayısı Nasıl Hesaplanır?</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.9">
+            <p style="margin-bottom:6px">Bir inspektörün <strong>birden fazla kaydı</strong> varsa her kayıttaki (Başlangıç–Bitiş) aralıklarına bakılır:</p>
+            <ol style="padding-left:18px;margin:0;line-height:2.1">
+              <li>Her kayıt için <em>Başlangıç Tarihi → Bitiş Tarihi</em> arasındaki fark hesaplanır</li>
+              <li>Tüm tarih aralıkları birleştirilir, <strong>çakışan günler bir kez sayılır</strong></li>
+              <li>Sonuç: inspektörün gerçek çalışma gün sayısı</li>
+            </ol>
+            <p style="margin-top:8px;font-size:11px;background:#fff8;padding:7px 10px;border-radius:6px;border-left:3px solid var(--amber)">
+              ⚠️ Mesai sütunu seçilmezse gün sayısı × 7,5 saat baz alınır. Mesai sütunu seçilirse o değer doğrudan kullanılır.
+            </p>
+          </div>
+        </div>
+
+        <!-- 4 - Performans seviyeleri -->
+        <div style="background:#f3e5f5;border:1px solid #ce93d8;border-radius:10px;padding:14px 16px">
+          <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">🏅 4 — Performans Seviyeleri</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+            <div style="text-align:center;padding:10px 8px;background:#E0F2F1;border-radius:8px;border:1px solid #B2DFDB">
+              <div style="font-size:18px;margin-bottom:4px">⭐</div>
+              <div style="font-size:13px;font-weight:700;color:#00695C">≥ 95%</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px">Mükemmel</div>
+            </div>
+            <div style="text-align:center;padding:10px 8px;background:var(--lblue2);border-radius:8px;border:1px solid var(--lblue)">
+              <div style="font-size:18px;margin-bottom:4px">👍</div>
+              <div style="font-size:13px;font-weight:700;color:var(--blue)">85–94%</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px">İyi</div>
+            </div>
+            <div style="text-align:center;padding:10px 8px;background:var(--lamber);border-radius:8px;border:1px solid #FFE082">
+              <div style="font-size:18px;margin-bottom:4px">⚠️</div>
+              <div style="font-size:13px;font-weight:700;color:var(--amber)">70–84%</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px">Orta</div>
+            </div>
+            <div style="text-align:center;padding:10px 8px;background:var(--lred);border-radius:8px;border:1px solid #FFCDD2">
+              <div style="font-size:18px;margin-bottom:4px">🔴</div>
+              <div style="font-size:13px;font-weight:700;color:var(--red)">< 70%</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px">Düşük</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5 - Sheets entegrasyonu -->
+        <div style="background:linear-gradient(135deg,#E8F5E9 0%,#fff 100%);border:1px solid #A5D6A7;border-radius:10px;padding:14px 16px">
+          <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px">☁️ 5 — Google Sheets Entegrasyonu</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="background:#fff;border:1px solid #A5D6A7;border-radius:8px;padding:11px 13px">
+              <div style="font-size:12px;font-weight:700;color:#2E7D32;margin-bottom:6px">📤 Sheets'e Gönder</div>
+              <ul style="font-size:11px;color:var(--muted);line-height:1.9;padding-left:16px;margin:0">
+                <li>Mevcut <strong>${toplamInsp} inspector</strong> verisini buluta yükler</li>
+                <li>Hem okunabilir tablo hem ham JSON gönderilir</li>
+                <li>Diğer bilgisayarlardan erişime açılır</li>
+                <li>Otomatik tarih damgası ekler</li>
+              </ul>
+            </div>
+            <div style="background:#fff;border:1px solid #A5D6A7;border-radius:8px;padding:11px 13px">
+              <div style="font-size:12px;font-weight:700;color:#1565C0;margin-bottom:6px">📥 Sheets'ten Çek</div>
+              <ul style="font-size:11px;color:var(--muted);line-height:1.9;padding-left:16px;margin:0">
+                <li>Sheets'teki ham JSON verisi çekilir</li>
+                <li>Onay sonrası mevcut verilerin üzerine yazar</li>
+                <li>Dashboard ve Canlı Gösterim güncellenir</li>
+                <li>Son kayıt tarihi gösterilir</li>
+              </ul>
+            </div>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--muted);padding:8px 12px;background:rgba(255,255,255,.7);border-radius:6px;border-left:3px solid #4CAF50">
+            💡 Bağlantı kurulmamışsa <strong>Klasman Yönetimi → Bağlantı Ayarları</strong> bölümünden Web App URL ve API Token girin.
+          </div>
+        </div>
+
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;margin-top:18px;gap:10px">
+        <button onclick="this.closest('[style*=fixed]').remove()" style="padding:8px 20px;background:var(--blue2);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Tamam</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+
 // ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 // VERI YÖNETİMİ (LOCALSTORAGE)
 // ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -3212,7 +3505,7 @@ function showInspectorDetail(inspectorName) {
           <td style="padding:9px 12px;text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:var(--blue2);">${k.kontrolAdetSuresi}sn</td>
           <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;">
             <span style="color:var(--blue2)">${fmtSn(k.kontrolAdetSuresi * k.adet)}</span>
-            ${k.istasyonSuresi > 0 ? `<span style="color:var(--muted);font-size:10px;display:block">${fmtSn(k.istasyonSuresi)} ist.</span>` : ''}
+            ${k.istasyonSuresi > 0 ? `<span style="color:var(--muted);font-size:10px;display:block">+ ${fmtSn(k.istasyonSuresi)} istasyon</span>` : ''}
             <span style="color:var(--navy);font-weight:600;font-size:13px;">${fmtSn(k.standartSure)}</span>
           </td>
           <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;color:${k.kayitFiiliSure>0?'var(--green)':'var(--muted2)'};">${fmtSn(k.kayitFiiliSure)}</td>
@@ -4156,7 +4449,8 @@ function performansHesapla(){
     const normalKey = normalize(k.ad);
     klasmanMap[normalKey] = {
       urunKontrolSuresi: parseFloat(k.urunKontrolSuresi) || 0,
-      istasyonSuresi: k.istasyonlar.reduce((s,i)=>s+(parseFloat(i.sure)||0),0)
+      istasyonSuresi: k.istasyonlar.reduce((s,i)=>s+(parseFloat(i.sure)||0),0),
+      istasyonDetay: k.istasyonlar.map(i => ({ ad: i.ad, sure: parseFloat(i.sure)||0 }))
     };
   });
 
@@ -4244,7 +4538,7 @@ function performansHesapla(){
     if (kayitFiiliSure && kayitFiiliSure > 0) {
       kl.toplamKayitFiiliSure += kayitFiiliSure;
     }
-    kl.kayitlar.push({ no: kl.kayitlar.length + 1, klasman: excelKlasman, adet, standartSure, kayitFiiliSure, kontrolAdetSuresi: klasmanInfo.urunKontrolSuresi, istasyonSuresi: klasmanInfo.istasyonSuresi, baslangic: parsedBaslangic, bitis: parsedBitis, tarihGecerli });
+    kl.kayitlar.push({ no: kl.kayitlar.length + 1, klasman: excelKlasman, adet, standartSure, kayitFiiliSure, kontrolAdetSuresi: klasmanInfo.urunKontrolSuresi, istasyonSuresi: klasmanInfo.istasyonSuresi, istasyonDetay: klasmanInfo.istasyonDetay || [], baslangic: parsedBaslangic, bitis: parsedBitis, tarihGecerli });
 
     inspectorMap[ins].toplamAdet += adet;
   });
@@ -5315,7 +5609,7 @@ const LAST_VERSION_KEY = 'lc_inspection_last_version';
 function checkVersion() {
   const lastVersion = localStorage.getItem(LAST_VERSION_KEY);
   if (lastVersion !== APP_VERSION) {
-    console.log(`🎉  Inspection Panel güncellendi! v${lastVersion || '1.0.0'} → v${APP_VERSION}`);
+    console.log(`🎉 Inspection Panel güncellendi! v${lastVersion || '1.0.0'} → v${APP_VERSION}`);
     localStorage.setItem(LAST_VERSION_KEY, APP_VERSION);
     
     if (lastVersion) {
