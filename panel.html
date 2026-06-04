@@ -848,6 +848,25 @@ label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; 
   background: linear-gradient(90deg, var(--blue), var(--blue3));
   border-radius: 10px 10px 0 0;
 }
+.kl-card.completed::before {
+  background: linear-gradient(90deg, var(--green), #26A69A);
+}
+.kl-card.completed { border-color: #B2DFDB; }
+.kl-card.completed:hover { border-color: var(--green); }
+.kl-card.completed.selected { background: #E0F2F1; border-color: var(--green); box-shadow: 0 0 0 2px rgba(0,137,123,.2); }
+.kl-filter-bar {
+  display: flex; gap: 6px; padding: 8px 12px;
+  border-bottom: 1px solid var(--border2); background: var(--offwhite);
+}
+.kl-filter-btn {
+  padding: 4px 11px; border-radius: 99px; font-size: 11px; font-weight: 600;
+  cursor: pointer; border: 1.5px solid var(--border2); background: var(--white);
+  color: var(--muted); transition: all .14s;
+}
+.kl-filter-btn:hover { border-color: var(--blue3); color: var(--blue); }
+.kl-filter-btn.active { background: var(--blue2); border-color: var(--blue2); color: #fff; }
+.kl-filter-btn.active-green { background: var(--green); border-color: var(--green); color: #fff; }
+.kl-filter-btn.active-amber { background: var(--amber); border-color: var(--amber); color: #fff; }
 .kl-card:hover { box-shadow: var(--shadow2); transform: translateY(-2px); border-color: var(--blue3); }
 .kl-card.selected { background: var(--lblue2); border-color: var(--blue3); box-shadow: 0 0 0 2px rgba(33,150,243,.2); }
 .kl-card-icon { font-size: 22px; margin-bottom: 6px; }
@@ -1228,6 +1247,13 @@ label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; 
               <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--muted2)">🔍</span>
               <input id="search-input" placeholder="Klasman ara…" oninput="aramaYap()" style="font-size:12px;padding-left:30px">
             </div>
+          </div>
+          <!-- Tamamlanma Filtresi -->
+          <div class="kl-filter-bar" id="kl-filter-bar">
+            <button class="kl-filter-btn active" id="kl-f-all"    onclick="setKlFilter('all')"  >Tümü</button>
+            <button class="kl-filter-btn"         id="kl-f-done"   onclick="setKlFilter('done')" >✅ Girişi Tamamlananlar</button>
+            <button class="kl-filter-btn"         id="kl-f-undone" onclick="setKlFilter('undone')">⚠️ Tamamlanmayanlar</button>
+            <span id="kl-filter-counts" style="margin-left:auto;font-size:10px;color:var(--muted);align-self:center"></span>
           </div>
           <!-- Grid view -->
           <div id="klasman-liste" style="min-height:200px"></div>
@@ -3738,8 +3764,44 @@ function exportInspectorDetail() {
 // ────────────────────────────
 // KLASMAN YÖNETİMİ
 // ────────────────────────────
+let klFilter = 'all'; // 'all' | 'done' | 'undone'
+
+function isKlasmanTamamlandi(k) {
+  // Manuel işaretleme öncelikli; işaretlenmemişse false
+  return k.tamamlandi === true;
+}
+
+function toggleKlasmanTamamlandi(kId) {
+  const k = klasmanlar.find(x => x.id === kId);
+  if (!k) return;
+  k.tamamlandi = !k.tamamlandi;
+  saveData();
+  renderListe();
+  renderEditor();
+}
+
+function setKlFilter(val) {
+  klFilter = val;
+  sayfa = 1;
+  // Buton stillerini güncelle
+  ['all','done','undone'].forEach(v => {
+    const btn = document.getElementById('kl-f-' + v);
+    if (!btn) return;
+    btn.className = 'kl-filter-btn';
+    if (v === val) {
+      if (v === 'done')   btn.className += ' active-green';
+      else if (v === 'undone') btn.className += ' active-amber';
+      else btn.className += ' active';
+    }
+  });
+  renderListe();
+}
+
 function filtered(){ 
-  return klasmanlar.filter(k=>k.ad.toLowerCase().includes(aramaStr.toLowerCase())); 
+  let list = klasmanlar.filter(k => k.ad.toLowerCase().includes(aramaStr.toLowerCase()));
+  if (klFilter === 'done')   list = list.filter(k => isKlasmanTamamlandi(k));
+  if (klFilter === 'undone') list = list.filter(k => !isKlasmanTamamlandi(k));
+  return list;
 }
 
 function aramaYap(){ 
@@ -3762,17 +3824,27 @@ function renderListe(){
   if(sayfa > tp) sayfa = tp;
   const slice = fl.slice((sayfa - 1) * KL_PER_PAGE, sayfa * KL_PER_PAGE);
   const el = document.getElementById('klasman-liste');
-  
-  const icons = KL_ICONS; // geriye dönük uyumluluk — artık k.icon kullanılıyor
+
+  // Tamamlanma sayaçlarını güncelle
+  const totalAll   = klasmanlar.filter(k => k.ad.toLowerCase().includes(aramaStr.toLowerCase())).length;
+  const totalDone  = klasmanlar.filter(k => k.ad.toLowerCase().includes(aramaStr.toLowerCase()) && isKlasmanTamamlandi(k)).length;
+  const totalUndone = totalAll - totalDone;
+  const countEl = document.getElementById('kl-filter-counts');
+  if (countEl) countEl.textContent = `✅ ${totalDone}  ·  ⚠️ ${totalUndone}`;
 
   if(!slice.length){
     el.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><h3>Bulunamadı</h3><p>Arama kriterini değiştirin</p></div>';
   } else {
     el.innerHTML = '<div class="kl-grid">' + slice.map(k => {
-      const icon = k.icon || KL_ICONS[k.id % KL_ICONS.length];
-      const sure = birAdet(k).toFixed(1);
-      const selected = k.id === secilenId;
-      return `<div class="kl-card${selected?' selected':''}" onclick="selectKlasman(${k.id})">
+      const icon      = k.icon || KL_ICONS[k.id % KL_ICONS.length];
+      const sure      = birAdet(k).toFixed(1);
+      const selected  = k.id === secilenId;
+      const tamam     = isKlasmanTamamlandi(k);
+      const checkBadge = tamam
+        ? `<span style="position:absolute;top:6px;right:6px;font-size:11px;background:#E0F2F1;color:var(--green);border-radius:99px;padding:1px 6px;font-weight:700;border:1px solid #B2DFDB">✓</span>`
+        : '';
+      return `<div class="kl-card${selected?' selected':''}${tamam?' completed':''}" onclick="selectKlasman(${k.id})">
+        ${checkBadge}
         <div class="kl-card-icon">${icon}</div>
         <div class="kl-card-name" title="${k.ad}">${k.ad}</div>
         <div class="kl-card-meta">⚙️ ${k.istasyonlar.length} ist. &nbsp;·&nbsp; ⏱ ${sure}sn</div>
@@ -3866,7 +3938,16 @@ function renderEditor(){
 
       <!-- Klasman Adı & İkon Düzenleme -->
       <div style="padding:14px;background:var(--offwhite);border:1px solid var(--border2);border-radius:10px;margin-bottom:16px;">
-        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">✏️ Klasman Bilgileri</div>
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          ✏️ Klasman Bilgileri
+          <button onclick="toggleKlasmanTamamlandi(${k.id})" title="Tıklayarak işaretle / kaldır"
+            style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:99px;border:1.5px solid ${isKlasmanTamamlandi(k)?'#81C784':'#FFE082'};
+            background:${isKlasmanTamamlandi(k)?'#E0F2F1':'var(--lamber)'};
+            color:${isKlasmanTamamlandi(k)?'var(--green)':'var(--amber)'};
+            font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:all .15s;font-family:'DM Sans',sans-serif">
+            ${isKlasmanTamamlandi(k) ? '✅ Tamamlandı' : '⚠️ Tamamlanmadı'}
+          </button>
+        </div>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
           <span style="font-size:28px;">${curIcon}</span>
           <input value="${k.ad}" onblur="updateKlasmanAd(${k.id},this.value)" onkeydown="if(event.key==='Enter'){this.blur();}" 
@@ -5609,7 +5690,7 @@ const LAST_VERSION_KEY = 'lc_inspection_last_version';
 function checkVersion() {
   const lastVersion = localStorage.getItem(LAST_VERSION_KEY);
   if (lastVersion !== APP_VERSION) {
-    console.log(`🎉 Inspection Panel güncellendi! v${lastVersion || '1.0.0'} → v${APP_VERSION}`);
+    console.log(`🎉  Inspection Panel güncellendi! v${lastVersion || '1.0.0'} → v${APP_VERSION}`);
     localStorage.setItem(LAST_VERSION_KEY, APP_VERSION);
     
     if (lastVersion) {
