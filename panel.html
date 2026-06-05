@@ -1694,8 +1694,14 @@ function jsonpFetch(url, params) {
   const action = params.action || '';
   const token  = params.token  || '';
   return new Promise((resolve, reject) => {
-    const iframeUrl = url + '?action=' + encodeURIComponent(action) +
-                           '&token='  + encodeURIComponent(token);
+    // action ve token dışındaki tüm parametreleri de URL'e ekle
+    let iframeUrl = url + '?action=' + encodeURIComponent(action) +
+                          '&token='  + encodeURIComponent(token);
+    Object.entries(params).forEach(([k, v]) => {
+      if (k !== 'action' && k !== 'token') {
+        iframeUrl += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(v);
+      }
+    });
 
     const iframe = document.createElement('iframe');
     iframe.src = iframeUrl;
@@ -3530,15 +3536,30 @@ async function showInspectorDetail(inspectorName) {
         const data = await jsonpFetch(url, { action: 'getInspectorKayitlar', token, inspectorAdi: inspectorName });
         if (data.status === 'ok' && data.kayitlar && typeof data.kayitlar === 'object') {
           // Çekilen kayitlar'ı inspector nesnesine işle
+          // NOT: Sheets'teki klasman adı ile performansData'daki klasman adı
+          // büyük/küçük harf veya boşluk farkı olabilir — case-insensitive eşleştir
+          const insKlasmanKeys = Object.keys(inspector.klasmanlar);
           Object.entries(data.kayitlar).forEach(([klasmanAd, kayitlarArr]) => {
-            if (inspector.klasmanlar[klasmanAd] && Array.isArray(kayitlarArr)) {
-              inspector.klasmanlar[klasmanAd].kayitlar = kayitlarArr.map(r => ({
-                ...r,
-                baslangic: r.baslangic ? (r.baslangic instanceof Date ? r.baslangic : (() => { const d = new Date(r.baslangic); return isNaN(d.getTime()) ? null : d; })()) : null,
-                bitis:     r.bitis     ? (r.bitis     instanceof Date ? r.bitis     : (() => { const d = new Date(r.bitis);     return isNaN(d.getTime()) ? null : d; })()) : null
-              }));
-            }
+            if (!Array.isArray(kayitlarArr) || kayitlarArr.length === 0) return;
+            // Önce birebir eşleştir, yoksa normalize edilmiş eşleştir
+            let hedefKey = insKlasmanKeys.find(k => k === klasmanAd)
+              || insKlasmanKeys.find(k => k.trim().toLowerCase() === klasmanAd.trim().toLowerCase());
+            if (!hedefKey) return;
+            inspector.klasmanlar[hedefKey].kayitlar = kayitlarArr.map(r => ({
+              ...r,
+              kontrolAdetSuresi: r.kontrolAdetSuresi || 0,
+              istasyonSuresi: r.istasyonSuresi || 0,
+              standartSure: r.standartSure || 0,
+              kayitFiiliSure: r.kayitFiiliSure || 0,
+              tarihGecerli: r.tarihGecerli || false,
+              baslangic: r.baslangic ? (() => { const d = new Date(r.baslangic); return isNaN(d.getTime()) ? null : d; })() : null,
+              bitis:     r.bitis     ? (() => { const d = new Date(r.bitis);     return isNaN(d.getTime()) ? null : d; })() : null
+            }));
           });
+          console.log('[detay] Sheets kayitlari yuklendi:', inspectorName,
+            Object.values(inspector.klasmanlar).reduce((s,kd)=>s+(kd.kayitlar||[]).length,0), 'kayit');
+        } else {
+          console.warn('[detay] getInspectorKayitlar bos/hata dondu:', JSON.stringify(data).substring(0,200));
         }
       } catch(e) {
         console.warn('getInspectorKayitlar hatası:', e.message);
