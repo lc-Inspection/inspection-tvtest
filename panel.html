@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title> Inspection Performans Paneli</title>
+<title>LC Waikiki — Inspection Performans Paneli</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -984,7 +984,7 @@ label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; 
     <div class="topbar-logo">LC</div>
     <div class="topbar-title">
       Inspection Performans
-      <small>Inspection Kontrol</small>
+      <small>LC Waikiki — Kalite Kontrol</small>
     </div>
   </div>
   <div class="topbar-right">
@@ -1489,7 +1489,7 @@ label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; 
             <div class="slideshow-logo">
               <div class="slideshow-logo-icon">LC</div>
               <div class="slideshow-logo-text">
-                <div>Inspection</div>
+                <div>LC Waikiki</div>
                 <div>Inspection Performance</div>
               </div>
             </div>
@@ -1549,7 +1549,7 @@ label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; 
                 <span id="slide-counter">Gösterim başlatılmadı</span>
               </div>
               <div class="slideshow-footer-center">
-                <span id="slide-title">Inspection Performance Dashboard</span>
+                <span id="slide-title">LC Waikiki Inspection Performance Dashboard</span>
               </div>
               <div class="slideshow-footer-right">
                 <span id="slide-date">--</span>
@@ -1593,7 +1593,6 @@ label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; 
     <div id="detail-modal-content"></div>
     <div class="modal-actions">
       <button class="btn btn-success" onclick="exportInspectorDetail()">📊 Excel İndir</button>
-      <button class="btn" style="background:#0078D4;color:#fff;border-color:#0078D4;" onclick="mailGonderOzet()">📧 Outlook'a Gönder</button>
       <button class="btn" onclick="closeDetailModal()">Kapat</button>
     </div>
   </div>
@@ -1652,7 +1651,7 @@ let animationEffect = 'slide'; // slide, fade, zoom, flip
 // APP CONFIG (Tüm Ayarlar)
 // ────────────────────────────
 const APP_CONFIG_KEY = 'lc_inspection_config';
-const DEFAULT_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxaAf2ugAmnMIujDQyIeFviZJKg5oyLxiMoJ9R-G_8LGjLgyv1QTAONVbSOiGOnz55Vag/exec';
+const DEFAULT_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbymkAClCnqRdV5dWslp3Jj5AVEV0xbe1GXTbK4fHk6gX3VKWK3CK21DAXVvENFeI1I1nA/exec';
 const DEFAULT_API_TOKEN  = 'lcw-secret-2024';
 let appConfig = {
   password: '',  // Şifre localStorage veya Sheets'ten yüklenir — kaynak kodda saklanmaz
@@ -1671,10 +1670,15 @@ async function pushConfigToSheets() {
   const token = appConfig.sheetsApiToken;
   if (!url || !token) return;
   try {
-    await iframePost(url, {
-      action: 'setConfig',
-      token: token,
-      config: { password: appConfig.password }
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'setConfig',
+        token: token,
+        config: { password: appConfig.password }
+      }),
+      mode: 'no-cors'
     });
     console.log('✅ Config (şifre) Sheets\'e gönderildi');
   } catch(e) { console.warn('Config push hatası:', e.message); }
@@ -1724,65 +1728,6 @@ function jsonpFetch(url, params) {
     window.addEventListener('message', handler);
   });
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// iframe POST — Google Apps Script'e POST gönderir, yanıtı postMessage ile alır.
-// no-cors POST Apps Script'e ulaşıyor fakat Apps Script doPost yerine doGet'i
-// çalıştırıyor (302 redirect nedeniyle). Bu fonksiyon form submit + hidden iframe
-// yöntemi kullanarak redirect'i doğru takip eder ve iframeResp yanıtını alır.
-// ─────────────────────────────────────────────────────────────────────────────
-function iframePost(url, payload, timeoutMs = 30000) {
-  return new Promise((resolve, reject) => {
-    const iframeName = 'gs_post_' + Date.now();
-    const iframe = document.createElement('iframe');
-    iframe.name = iframeName;
-    iframe.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;border:none;';
-    document.body.appendChild(iframe);
-
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = url;
-    form.target = iframeName;
-    form.style.display = 'none';
-
-    // JSON payload'ı tek bir hidden input olarak gönder (Apps Script text/plain bekliyor)
-    // Apps Script form POST'unda e.postData.contents = input value olur
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'payload';
-    input.value = JSON.stringify(payload);
-    form.appendChild(input);
-    document.body.appendChild(form);
-
-    const timer = setTimeout(() => {
-      cleanup();
-      // Timeout olursa başarılı kabul et (no-cors gibi — fire and forget)
-      resolve({ status: 'ok', message: 'Gönderildi (yanıt beklenmedi)' });
-    }, timeoutMs);
-
-    function handler(event) {
-      const trusted = ['googleusercontent.com', 'script.google.com'];
-      if (!trusted.some(o => event.origin.includes(o))) return;
-      clearTimeout(timer);
-      window.removeEventListener('message', handler);
-      cleanup();
-      resolve(event.data);
-    }
-
-    function cleanup() {
-      window.removeEventListener('message', handler);
-      try { if (form.parentNode) form.parentNode.removeChild(form); } catch(e) {}
-      try { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch(e) {}
-    }
-
-    window.addEventListener('message', handler);
-    form.submit();
-  });
-}
-
-// Apps Script doPost form POST'u için payload okuma:
-// e.postData.contents yerine e.parameter.payload kullanılır.
-// Bu yüzden Apps Script kodunu da güncellemek gerekir — bkz. açıklama.
 
 async function pullConfigFromSheets() {
   const url = appConfig.sheetsWebAppUrl;
@@ -2155,7 +2100,12 @@ async function pushToSheets() {
       klasmanlar: klasmanlar,
       savedAt: new Date().toISOString()
     };
-    await iframePost(url, payload);
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload),
+      mode: 'no-cors'  // Google Apps Script CORS kısıtlaması nedeniyle
+    });
     showSuccessMessage('✅ ' + klasmanlar.length + ' klasman Google Sheets\'e gönderildi!');
   } catch(err) {
     alert('❌ Gönderme hatası: ' + err.message);
@@ -2238,9 +2188,10 @@ async function pullFromSheets() {
 async function pushPerformansToSheets(liste) {
   const url = appConfig.sheetsWebAppUrl;
   const token = appConfig.sheetsApiToken;
-  if (!url || !token) return;
+  if (!url || !token) return; // Bağlantı ayarı yapılmamışsa sessizce çık
 
   try {
+    // performansData'yı düz tablo formatına çevir (Sheets için okunabilir)
     const rows = liste.map(row => ({
       ins: row.ins,
       adet: row.adet,
@@ -2255,14 +2206,21 @@ async function pushPerformansToSheets(liste) {
         .join(' | ')
     }));
 
-    await iframePost(url, {
+    const payload = {
       action: 'setPerformans',
-      token,
+      token: token,
       performans: rows,
       savedAt: new Date().toISOString()
+    };
+
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload),
+      mode: 'no-cors'
     });
 
-    console.log('✅ Performans özet verisi Sheets\'e gönderildi:', rows.length, 'inspector');
+    console.log('✅ Performans verisi Sheets\'e gönderildi:', rows.length, 'inspector');
   } catch(err) {
     console.warn('Performans Sheets gönderme hatası:', err.message);
   }
@@ -2272,84 +2230,23 @@ async function pushPerformansToSheets(liste) {
 // PERFORMANS HAM VERİSİNİ SHEETS'E GÖNDER
 // Tam JSON — farklı bilgisayarlardan çekilebilir
 // ─────────────────────────────────────────────
-// Sheets hücresi maks ~50.000 karakter sınırına sahip.
-// Bu yüzden kayitlar[] içindeki ağır alanlar (istasyonDetay, fiiliSure gibi)
-// gönderilmeden önce temizlenir. Detay modal verileri (baslangic/bitis) korunur.
-function _slimForSheets(liste) {
-  return liste.map(ins => ({
-    ins: ins.ins,
-    adet: ins.adet,
-    kayit: ins.kayit,
-    standartSure: ins.standartSure,
-    mesaiSure: ins.mesaiSure,
-    fiiliSure: ins.fiiliSure,
-    kayitFiiliSure: ins.kayitFiiliSure,
-    genelHizPerf: ins.genelHizPerf,
-    genelPerformans: ins.genelPerformans,
-    verimlilikPerf: ins.verimlilikPerf,
-    gunSayisi: ins.gunSayisi,
-    tarihBasariliKayit: ins.tarihBasariliKayit,
-    gunlukDetay: ins.gunlukDetay || [],
-    klasmanlar: Object.fromEntries(
-      Object.entries(ins.klasmanlar || {}).map(([kAd, kd]) => [kAd, {
-        adet: kd.adet,
-        standartSure: kd.standartSure,
-        kayitFiiliSure: kd.kayitFiiliSure,
-        hizPerf: kd.hizPerf,
-        hacimPerf: kd.hacimPerf,
-        // kayitlar: sadece detay modal için gerekli alanlar, ağır alanlar atılır
-        kayitlar: (kd.kayitlar || []).map(k => ({
-          no: k.no,
-          klasman: k.klasman,
-          adet: k.adet,
-          standartSure: k.standartSure,
-          kayitFiiliSure: k.kayitFiiliSure,
-          kontrolAdetSuresi: k.kontrolAdetSuresi,
-          istasyonSuresi: k.istasyonSuresi,
-          // istasyonDetay kaldırıldı — çok büyük
-          baslangic: k.baslangic instanceof Date ? k.baslangic.toISOString() : (k.baslangic || null),
-          bitis: k.bitis instanceof Date ? k.bitis.toISOString() : (k.bitis || null),
-          tarihGecerli: k.tarihGecerli
-        }))
-      }])
-    )
-  }));
-}
-
 async function pushPerformansRawToSheets(liste) {
   const url   = appConfig.sheetsWebAppUrl;
   const token = appConfig.sheetsApiToken;
   if (!url || !token) return;
   try {
-    const slim = _slimForSheets(liste);
-    const jsonStr = JSON.stringify(slim);
-    console.log(`📤 Ham veri boyutu: ${Math.round(jsonStr.length / 1024)}KB (${slim.length} inspector)`);
-
-    // Sheets hücresi ~50KB sınırı — aşılırsa kayitlar'ı boşalt ve tekrar dene
-    if (jsonStr.length > 45000) {
-      console.warn('⚠️ Veri büyük, kayıt detayları kırpılıyor...');
-      const slimNokayit = slim.map(ins => ({
-        ...ins,
-        klasmanlar: Object.fromEntries(
-          Object.entries(ins.klasmanlar).map(([k, v]) => [k, { ...v, kayitlar: [] }])
-        )
-      }));
-      await iframePost(url, {
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
         action: 'setPerformansRaw',
-        token,
-        performansData: slimNokayit,
+        token: token,
+        performansData: liste,
         savedAt: new Date().toISOString()
-      });
-      console.warn('⚠️ Kayıt detayları (baslangic/bitis) Sheets\'e yazılamadı — veri çok büyük. Detay modal başka bilgisayarda açılmayabilir.');
-    } else {
-      await iframePost(url, {
-        action: 'setPerformansRaw',
-        token,
-        performansData: slim,
-        savedAt: new Date().toISOString()
-      });
-      console.log('✅ Ham performans verisi Sheets\'e gönderildi:', slim.length, 'inspector,', Math.round(jsonStr.length/1024), 'KB');
-    }
+      }),
+      mode: 'no-cors'
+    });
+    console.log('✅ Ham performans verisi Sheets\'e gönderildi:', liste.length, 'inspector');
   } catch(err) {
     console.warn('Ham performans push hatası:', err.message);
   }
@@ -2440,7 +2337,7 @@ SHEET_NAME = 'Klasmanlar'      ← Sekme adı (değiştirmeye gerek yok)</div>
           <ol style="font-size:11px;color:var(--muted);line-height:2;padding-left:18px">
             <li>Apps Script editöründe: <strong>Dağıt → Yeni Dağıtım</strong></li>
             <li>Tür: <strong>Web uygulaması</strong></li>
-            <li>Açıklama: <em>Klasman Sync v1</em></li>
+            <li>Açıklama: <em>LC Waikiki Klasman Sync v1</em></li>
             <li>Farklı çalıştır: <strong>Ben (hesabınız)</strong></li>
             <li>Erişimi olan: <strong>Herkes</strong></li>
             <li><strong>Dağıt</strong>'a tıklayın → Google hesabı izni isteyecek, onaylayın</li>
@@ -2461,7 +2358,7 @@ SHEET_NAME = 'Klasmanlar'      ← Sekme adı (değiştirmeye gerek yok)</div>
         <div style="background:var(--lred);border:1px solid #FFCDD2;border-radius:10px;padding:12px 14px">
           <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:4px">⚠️ Önemli Notlar</div>
           <ul style="font-size:11px;color:var(--muted);line-height:1.8;padding-left:16px">
-            <li>Gönderme (📤) işlemi iframe form submit yöntemiyle çalışır — Apps Script redirect'ini doğru takip eder</li>
+            <li>Gönderme (📤) işlemi <em>no-cors</em> modunda çalışır — yanıt göremezsiniz ama veri gider</li>
             <li>Çekme (📥) işlemi CORS gerektirir — Apps Script "Herkes" erişimine açık olmalı</li>
             <li>Script kodu değiştirilirse <strong>yeni bir dağıtım</strong> oluşturulmalı (eski URL değişmez)</li>
             <li>Farklı bilgisayarlarda aynı URL ve Token kullanılmalı</li>
@@ -2513,10 +2410,20 @@ async function pushPerformansManual(ev) {
         .join(' | ')
     }));
 
-    await iframePost(url, { action: 'setPerformans', token, performans: rows, savedAt: new Date().toISOString() });
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'setPerformans', token, performans: rows, savedAt: new Date().toISOString() }),
+      mode: 'no-cors'
+    });
 
-    // 2) Ham JSON'u gönder (farklı bilgisayardan çekilebilmesi için — slim format)
-    await pushPerformansRawToSheets(performansData);
+    // 2) Ham JSON'u gönder (farklı bilgisayardan çekilebilmesi için)
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'setPerformansRaw', token, performansData, savedAt: new Date().toISOString() }),
+      mode: 'no-cors'
+    });
 
     showSuccessMessage(`✅ ${performansData.length} inspector verisi Google Sheets'e gönderildi!`);
   } catch(err) {
@@ -2818,49 +2725,21 @@ function loadData() {
 // Local Storage'a veri kaydet
 function saveData() {
   try {
-    // localStorage 5MB sınırı — kayitlar[] ve gunlukDetay[] çıkarılır.
-    // Bu veriler Sheets'te (PerformansRaw) tutulur; detay modal oradan çeker.
-    const performansSlim = performansData.map(ins => ({
-      ...ins,
-      gunlukDetay: [],   // tarih detayı — büyük, Sheets'te var
-      klasmanlar: Object.fromEntries(
-        Object.entries(ins.klasmanlar || {}).map(([k, v]) => [k, {
-          adet: v.adet,
-          standartSure: v.standartSure,
-          kayitFiiliSure: v.kayitFiiliSure,
-          hizPerf: v.hizPerf,
-          hacimPerf: v.hacimPerf,
-          kayitlar: []   // kayıt detayı — büyük, Sheets'te var
-        }])
-      )
-    }));
-
     const data = {
       klasmanlar: klasmanlar,
       nextId: nextId,
-      performansData: performansSlim,
+      performansData: performansData,
       verimlilikHedef: parseFloat(document.getElementById('inp-verimlilik')?.value) || 100,
       savedAt: new Date().toISOString()
     };
-
-    try {
-      localStorage.setItem('lc_inspection_data', JSON.stringify(data));
-    } catch(quotaErr) {
-      // Hâlâ doluysa performansData'yı da atla — sadece klasmanlar kalsın
-      console.warn('⚠️ localStorage dolu, sadece klasmanlar kaydediliyor');
-      localStorage.setItem('lc_inspection_data', JSON.stringify({
-        klasmanlar: klasmanlar,
-        nextId: nextId,
-        performansData: [],
-        verimlilikHedef: data.verimlilikHedef,
-        savedAt: data.savedAt
-      }));
-    }
-
+    localStorage.setItem('lc_inspection_data', JSON.stringify(data));
+    
     const notification = document.getElementById('save-notification');
     notification.classList.add('show');
-    setTimeout(() => notification.classList.remove('show'), 3000);
-
+    setTimeout(() => {
+      notification.classList.remove('show');
+    }, 3000);
+    
     console.log('✅ Veriler localStorage\'a kaydedildi');
   } catch (err) {
     console.error('❌ localStorage kaydetme hatası:', err);
@@ -3548,29 +3427,6 @@ function showInspectorDetail(inspectorName) {
 
   document.getElementById('detail-modal-title').textContent = `${inspector.ins} — Detaylı Performans`;
 
-  // kayitlar[] boşsa (localStorage'dan yüklenmiş, Sheets'ten gelmemiş) uyarı göster
-  const toplamKayitSayisi = Object.values(inspector.klasmanlar || {})
-    .reduce((s, kd) => s + (kd.kayitlar || []).length, 0);
-
-  if (toplamKayitSayisi === 0) {
-    document.getElementById('detail-modal-content').innerHTML = `
-      <div style="text-align:center;padding:48px 24px;">
-        <div style="font-size:40px;margin-bottom:14px;">📥</div>
-        <div style="font-size:15px;font-weight:700;color:var(--navy);margin-bottom:8px;">Kayıt detayları bu cihazda yok</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:24px;max-width:380px;margin-left:auto;margin-right:auto;line-height:1.7;">
-          Detaylı tablo (başlangıç/bitiş tarihleri, kayıt bazlı süreler) Google Sheets'te saklanıyor.<br>
-          Aşağıdaki butona tıklayarak çekebilirsiniz.
-        </div>
-        <button onclick="pullPerformansFromSheetsManual().then(()=>{ closeDetailModal(); setTimeout(()=>showInspectorDetail('${inspectorName.replace(/'/g,"\\'").replace(/"/g,'&quot;')}'),300); })"
-          style="padding:10px 28px;background:var(--blue2);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
-          📥 Sheets'ten Çek ve Detayı Göster
-        </button>
-      </div>
-    `;
-    document.getElementById('detail-modal').classList.add('open');
-    return;
-  }
-
   // Tüm kayıtları düz listeye çevir
   const tumKayitlar = [];
   Object.entries(inspector.klasmanlar).forEach(([klasmanAd, kd]) => {
@@ -3629,7 +3485,7 @@ function showInspectorDetail(inspectorName) {
 
   // Tablo satırları render fonksiyonu
   function renderKayitlar(liste) {
-    if (!liste.length) return '<tr><td colspan="11" style="padding:24px;text-align:center;color:var(--muted2);">Filtreye uyan kayıt bulunamadı.</td></tr>';
+    if (!liste.length) return '<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--muted2);">Filtreye uyan kayıt bulunamadı.</td></tr>';
 
     // Klasman grupları
     const gruplar = {};
@@ -3649,7 +3505,7 @@ function showInspectorDetail(inspectorName) {
       const grpOrt = grpAdet > 0 && grpFiili > 0 ? Math.round(grpFiili / grpAdet) : null;
 
       html += `<tr style="background:var(--navy);color:#fff;">
-        <td colspan="11" style="padding:8px 14px;font-size:12px;font-weight:700;letter-spacing:.3px;">
+        <td colspan="9" style="padding:8px 14px;font-size:12px;font-weight:700;letter-spacing:.3px;">
           📦 ${klasmanAd}
           <span style="font-weight:400;opacity:.7;margin-left:12px;font-size:11px;">
             ${kayitlar.length} kayıt &nbsp;·&nbsp; ${grpAdet} adet toplam &nbsp;·&nbsp; ${fmtSn(grpStandart)} standart
@@ -3688,29 +3544,6 @@ function showInspectorDetail(inspectorName) {
           </td>
           <td style="padding:9px 12px;text-align:center;font-size:11px;color:var(--muted);">
             ${k.tarihGecerli && k.bitis ? fmtTarih(k.bitis) : '—'}
-          </td>
-          <td style="padding:9px 12px;text-align:center;">
-            ${(() => {
-              if (!k.kayitFiiliSure || !k.standartSure) return '<span style="font-size:11px;color:var(--muted2);">—</span>';
-              const pct = Math.round((k.standartSure / k.kayitFiiliSure) * 100);
-              const col = pct >= 100 ? '#00897B' : pct >= 85 ? '#F57F17' : '#C62828';
-              const bg  = pct >= 100 ? '#E0F2F1' : pct >= 85 ? '#FFF8E1' : '#FFEBEE';
-              const lbl = pct >= 100 ? '✓' : '↑';
-              return `<span style="display:inline-block;padding:2px 7px;border-radius:20px;background:${bg};color:${col};font-weight:700;font-size:12px;font-family:'DM Mono',monospace;">${lbl} ${pct}%</span>`;
-            })()}
-          </td>
-          <td style="padding:6px 8px;text-align:center;"
-            data-ins="${inspector.ins.replace(/"/g,'&quot;')}"
-            data-klasman="${k.klasman.replace(/"/g,'&quot;')}"
-            data-adet="${k.adet}"
-            data-kontrolsure="${k.kontrolAdetSuresi}"
-            data-istasyon="${fmtSn(k.istasyonSuresi)}"
-            data-standart="${fmtSn(k.standartSure)}"
-            data-fiili="${k.kayitFiiliSure > 0 ? fmtSn(k.kayitFiiliSure) : '—'}"
-            data-ortkontrol="${k.ortalamaKontrolSn !== null ? k.ortalamaKontrolSn + 'sn' : '—'}"
-            data-pct="${k.kayitFiiliSure && k.standartSure ? Math.round((k.standartSure/k.kayitFiiliSure)*100) : ''}"
-            data-baslangic="${k.tarihGecerli && k.baslangic ? fmtTarih(k.baslangic) : '—'}"
-            data-bitis="${k.tarihGecerli && k.bitis ? fmtTarih(k.bitis) : '—'}">
           </td>
         </tr>`;
       });
@@ -3826,8 +3659,6 @@ function showInspectorDetail(inspectorName) {
             <th style="padding:10px 12px;text-align:center;font-size:11px;">Ort. Kontrol<br><span style="opacity:.6;font-weight:400">(sn/adet)</span></th>
             <th style="padding:10px 12px;text-align:center;font-size:11px;">Başlangıç</th>
             <th style="padding:10px 12px;text-align:center;font-size:11px;">Bitiş</th>
-            <th style="padding:10px 12px;text-align:center;font-size:11px;">% Uyum</th>
-            <th style="padding:10px 12px;text-align:center;font-size:11px;width:36px;"></th>
           </tr>
         </thead>
         <tbody id="det-kayit-tbody">
@@ -3855,118 +3686,6 @@ function showInspectorDetail(inspectorName) {
 function closeDetailModal() {
   document.getElementById('detail-modal').classList.remove('open');
   selectedInspectorDetail = null;
-}
-
-// ────────────────────────────
-// MAIL GÖNDER (OUTLOOK)
-// ────────────────────────────
-// ────────────────────────────────────────────────────────
-// OUTLOOK PNG GÖNDER
-// Adımlar:
-//  1. Modal içeriğini html2canvas ile PNG'ye çevir
-//  2. PNG'yi clipboard'a kopyala  (Clipboard API — image/png)
-//  3. Outlook'u boş mailto ile aç
-//  4. Kullanıcıya "Outlook açıldı → Ctrl+V ile yapıştırın" uyarısı göster
-// ────────────────────────────────────────────────────────
-async function mailGonderOzet() {
-  const inspector = selectedInspectorDetail;
-  if (!inspector) { alert('Inspector verisi bulunamadı.'); return; }
-
-  // Butonu devre dışı bırak, yükleniyor göster
-  const btn = document.querySelector('.modal-actions button[onclick="mailGonderOzet()"]');
-  const origText = btn ? btn.innerHTML : '';
-  if (btn) { btn.innerHTML = '⏳ Hazırlanıyor...'; btn.disabled = true; }
-
-  try {
-    // 1. html2canvas yükle
-    await _loadHtml2Canvas();
-
-    // 2. Modal içerik elementini bul
-    const modalBox = document.querySelector('#detail-modal .modal-box');
-    if (!modalBox) throw new Error('Modal bulunamadı');
-
-    // Yakalamadan önce modal'ın tam görünür olduğundan emin ol
-    modalBox.scrollTop = 0;
-
-    // 3. html2canvas ile render et — beyaz arka plan, yüksek kalite
-    const canvas = await html2canvas(modalBox, {
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      scale: 2,           // Retina kalitesi
-      logging: false,
-      removeContainer: false,
-      scrollY: -window.scrollY,
-      windowWidth: modalBox.scrollWidth,
-      windowHeight: modalBox.scrollHeight
-    });
-
-    // 4. Canvas → Blob (PNG)
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-
-    // 5. Clipboard'a PNG kopyala (modern Clipboard API)
-    if (navigator.clipboard && window.ClipboardItem) {
-      await navigator.clipboard.write([
-        new ClipboardItem({ 'image/png': blob })
-      ]);
-    } else {
-      throw new Error('Bu tarayıcı PNG clipboard kopyalamayı desteklemiyor.');
-    }
-
-    // 6. Outlook'u boş aç (subject ile)
-    const tarihStr = new Date().toLocaleDateString('tr-TR', { day:'2-digit', month:'2-digit', year:'numeric' });
-    const subject = encodeURIComponent('Inspection Performans Raporu — ' + inspector.ins + ' (' + tarihStr + ')');
-    window.location.href = 'mailto:?subject=' + subject;
-
-    // 7. Kullanıcıya talimat göster
-    setTimeout(() => {
-      _showMailTalimat();
-    }, 800);
-
-  } catch (err) {
-    console.error('PNG mail hatası:', err);
-    alert('❌ Hata: ' + err.message + '\n\nLütfen tarayıcınızın clipboard iznine izin verdiğinden emin olun.');
-  } finally {
-    if (btn) { btn.innerHTML = origText; btn.disabled = false; }
-  }
-}
-
-// Outlook talimat overlay'i
-function _showMailTalimat() {
-  const overlay = document.createElement('div');
-  overlay.style.cssText = `
-    position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;
-    display:flex;align-items:center;justify-content:center;
-    font-family:'Inter',sans-serif;
-  `;
-  overlay.innerHTML = `
-    <div style="background:#fff;border-radius:16px;padding:32px 36px;max-width:420px;
-      text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35);">
-      <div style="font-size:48px;margin-bottom:12px;">📋</div>
-      <div style="font-size:18px;font-weight:700;color:#0B2A52;margin-bottom:8px;">
-        PNG Panoya Kopyalandı!
-      </div>
-      <div style="font-size:14px;color:#555;line-height:1.7;margin-bottom:20px;">
-        Outlook yeni mail ekranı açılıyor.<br>
-        Mail gövdesine tıklayıp<br>
-        <strong style="color:#0078D4;font-size:16px;">Ctrl + V</strong><br>
-        ile raporu yapıştırın.
-      </div>
-      <div style="background:#f0f7ff;border:1px solid #b3d4f5;border-radius:8px;
-        padding:10px 14px;font-size:12px;color:#555;margin-bottom:20px;text-align:left;">
-        💡 Outlook açılmadıysa:<br>
-        • Masaüstü Outlook'ta <strong>Yeni E-posta</strong> açın<br>
-        • Gövdeye tıklayıp <strong>Ctrl+V</strong> yapın
-      </div>
-      <button onclick="this.closest('div[style*=position]').remove()"
-        style="background:#0078D4;color:#fff;border:none;border-radius:8px;
-        padding:10px 28px;font-size:14px;font-weight:600;cursor:pointer;">
-        Tamam
-      </button>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 }
 
 // ────────────────────────────
@@ -4432,9 +4151,9 @@ function excelYukle(e){
   const reader=new FileReader();
   reader.onload=function(ev){
     try{
-      const wb=XLSX.read(ev.target.result,{type:'binary',cellDates:true,dateNF:'yyyy-mm-dd hh:mm:ss'});
+      const wb=XLSX.read(ev.target.result,{type:'binary'});
       const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
       
       if(!rows.length){ 
         showFileStatus('❌ Dosya boş görünüyor.','var(--red)'); 
@@ -4471,20 +4190,12 @@ function fillColSelects(){
   const mesaiEl = document.getElementById('col-mesai');
   if (mesaiEl) mesaiEl.innerHTML = '<option value="">— opsiyonel —</option>' + excelCols.map(c=>`<option value="${c}">${c}</option>`).join('');
   
-  // Türkçe karakterleri normalize ederek sütun adı eşleştirme
-  function normColTR(s) {
-    return String(s)
-      .replace(/İ/g,'i').replace(/I/g,'i').replace(/Ş/g,'s').replace(/ş/g,'s')
-      .replace(/Ğ/g,'g').replace(/ğ/g,'g').replace(/Ü/g,'u').replace(/ü/g,'u')
-      .replace(/Ö/g,'o').replace(/ö/g,'o').replace(/Ç/g,'c').replace(/ç/g,'c')
-      .replace(/ı/g,'i').toLowerCase().replace(/[^a-z0-9]/g,'');
-  }
   // Otomatik tahmin
   const klasmanCol = excelCols[0] || '';
-  const adetCol = excelCols.find(c=>normColTR(c).includes('bakilacakmiktar')) || excelCols[17] || '';
-  const insCol = excelCols.find(c=>normColTR(c).includes('inspector')) || '';
-  const baslangicCol = excelCols.find(c=>normColTR(c).includes('inspectionbaslamatarihi')) || excelCols[10] || '';
-  const bitisCol = excelCols.find(c=>normColTR(c).includes('inspectionbitistarihi') || normColTR(c).includes('inspectionbitistarihi') || (normColTR(c).includes('inspection') && normColTR(c).includes('bitis'))) || excelCols[11] || '';
+  const adetCol = excelCols.find(c=>c.toLowerCase().includes('bakilacakmiktar')) || excelCols[17] || '';
+  const insCol = excelCols.find(c=>c.toLowerCase().includes('inspector')) || '';
+  const baslangicCol = excelCols.find(c=>c.toLowerCase().includes('inspectionbaslamatarihi')) || excelCols[10] || '';
+  const bitisCol = excelCols.find(c=>c.toLowerCase().includes('inspectionbitistarihi')) || excelCols[11] || '';
   
   if(klasmanCol && document.getElementById('col-klasman')) document.getElementById('col-klasman').value = klasmanCol;
   if(adetCol && document.getElementById('col-adet')) document.getElementById('col-adet').value = adetCol;
@@ -4813,20 +4524,7 @@ function performansHesapla(){
   }
 
   // Klasman mapping hazırla
-  // Türkçe karakterleri ASCII karşılığına çevir, sonra boşluk/özel karakterleri sil
-  function normalizeTR(str) {
-    return String(str).trim()
-      .replace(/İ/g,'i').replace(/I/g,'i')
-      .replace(/Ş/g,'s').replace(/ş/g,'s')
-      .replace(/Ğ/g,'g').replace(/ğ/g,'g')
-      .replace(/Ü/g,'u').replace(/ü/g,'u')
-      .replace(/Ö/g,'o').replace(/ö/g,'o')
-      .replace(/Ç/g,'c').replace(/ç/g,'c')
-      .replace(/ı/g,'i')
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g,'');
-  }
-  function normalize(str) { return normalizeTR(str); }
+  function normalize(str) { return String(str).toLowerCase().trim().replace(/[^\w]/g,''); }
   const klasmanMap = {};
   klasmanlar.forEach(k => {
     const normalKey = normalize(k.ad);
@@ -5992,7 +5690,7 @@ const LAST_VERSION_KEY = 'lc_inspection_last_version';
 function checkVersion() {
   const lastVersion = localStorage.getItem(LAST_VERSION_KEY);
   if (lastVersion !== APP_VERSION) {
-    console.log(`🎉  Inspection Panel güncellendi! v${lastVersion || '1.0.0'} → v${APP_VERSION}`);
+    console.log(`🎉 LC Waikiki Inspection Panel güncellendi! v${lastVersion || '1.0.0'} → v${APP_VERSION}`);
     localStorage.setItem(LAST_VERSION_KEY, APP_VERSION);
     
     if (lastVersion) {
@@ -6501,7 +6199,7 @@ if (window.location.hostname === 'localhost' || window.location.hostname === '12
 }
 
 // Uygulama hazır
-console.log(`✅ Inspection Performans Paneli v${APP_VERSION} hazır!`);
+console.log(`✅ LC Waikiki Inspection Performans Paneli v${APP_VERSION} hazır!`);
 console.log(`📊 ${klasmanlar.length} klasman, ${performansData.length} inspector verisi yüklendi`);
 
 </script>
