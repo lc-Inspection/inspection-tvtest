@@ -1652,7 +1652,7 @@ let animationEffect = 'slide'; // slide, fade, zoom, flip
 // APP CONFIG (Tüm Ayarlar)
 // ────────────────────────────
 const APP_CONFIG_KEY = 'lc_inspection_config';
-const DEFAULT_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbymkAClCnqRdV5dWslp3Jj5AVEV0xbe1GXTbK4fHk6gX3VKWK3CK21DAXVvENFeI1I1nA/exec';
+const DEFAULT_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxaAf2ugAmnMIujDQyIeFviZJKg5oyLxiMoJ9R-G_8LGjLgyv1QTAONVbSOiGOnz55Vag/exec';
 const DEFAULT_API_TOKEN  = 'lcw-secret-2024';
 let appConfig = {
   password: '',  // Şifre localStorage veya Sheets'ten yüklenir — kaynak kodda saklanmaz
@@ -2818,21 +2818,49 @@ function loadData() {
 // Local Storage'a veri kaydet
 function saveData() {
   try {
+    // localStorage 5MB sınırı — kayitlar[] ve gunlukDetay[] çıkarılır.
+    // Bu veriler Sheets'te (PerformansRaw) tutulur; detay modal oradan çeker.
+    const performansSlim = performansData.map(ins => ({
+      ...ins,
+      gunlukDetay: [],   // tarih detayı — büyük, Sheets'te var
+      klasmanlar: Object.fromEntries(
+        Object.entries(ins.klasmanlar || {}).map(([k, v]) => [k, {
+          adet: v.adet,
+          standartSure: v.standartSure,
+          kayitFiiliSure: v.kayitFiiliSure,
+          hizPerf: v.hizPerf,
+          hacimPerf: v.hacimPerf,
+          kayitlar: []   // kayıt detayı — büyük, Sheets'te var
+        }])
+      )
+    }));
+
     const data = {
       klasmanlar: klasmanlar,
       nextId: nextId,
-      performansData: performansData,
+      performansData: performansSlim,
       verimlilikHedef: parseFloat(document.getElementById('inp-verimlilik')?.value) || 100,
       savedAt: new Date().toISOString()
     };
-    localStorage.setItem('lc_inspection_data', JSON.stringify(data));
-    
+
+    try {
+      localStorage.setItem('lc_inspection_data', JSON.stringify(data));
+    } catch(quotaErr) {
+      // Hâlâ doluysa performansData'yı da atla — sadece klasmanlar kalsın
+      console.warn('⚠️ localStorage dolu, sadece klasmanlar kaydediliyor');
+      localStorage.setItem('lc_inspection_data', JSON.stringify({
+        klasmanlar: klasmanlar,
+        nextId: nextId,
+        performansData: [],
+        verimlilikHedef: data.verimlilikHedef,
+        savedAt: data.savedAt
+      }));
+    }
+
     const notification = document.getElementById('save-notification');
     notification.classList.add('show');
-    setTimeout(() => {
-      notification.classList.remove('show');
-    }, 3000);
-    
+    setTimeout(() => notification.classList.remove('show'), 3000);
+
     console.log('✅ Veriler localStorage\'a kaydedildi');
   } catch (err) {
     console.error('❌ localStorage kaydetme hatası:', err);
@@ -3519,6 +3547,29 @@ function showInspectorDetail(inspectorName) {
   selectedInspectorDetail = inspector;
 
   document.getElementById('detail-modal-title').textContent = `${inspector.ins} — Detaylı Performans`;
+
+  // kayitlar[] boşsa (localStorage'dan yüklenmiş, Sheets'ten gelmemiş) uyarı göster
+  const toplamKayitSayisi = Object.values(inspector.klasmanlar || {})
+    .reduce((s, kd) => s + (kd.kayitlar || []).length, 0);
+
+  if (toplamKayitSayisi === 0) {
+    document.getElementById('detail-modal-content').innerHTML = `
+      <div style="text-align:center;padding:48px 24px;">
+        <div style="font-size:40px;margin-bottom:14px;">📥</div>
+        <div style="font-size:15px;font-weight:700;color:var(--navy);margin-bottom:8px;">Kayıt detayları bu cihazda yok</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:24px;max-width:380px;margin-left:auto;margin-right:auto;line-height:1.7;">
+          Detaylı tablo (başlangıç/bitiş tarihleri, kayıt bazlı süreler) Google Sheets'te saklanıyor.<br>
+          Aşağıdaki butona tıklayarak çekebilirsiniz.
+        </div>
+        <button onclick="pullPerformansFromSheetsManual().then(()=>{ closeDetailModal(); setTimeout(()=>showInspectorDetail('${inspectorName.replace(/'/g,"\\'").replace(/"/g,'&quot;')}'),300); })"
+          style="padding:10px 28px;background:var(--blue2);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
+          📥 Sheets'ten Çek ve Detayı Göster
+        </button>
+      </div>
+    `;
+    document.getElementById('detail-modal').classList.add('open');
+    return;
+  }
 
   // Tüm kayıtları düz listeye çevir
   const tumKayitlar = [];
