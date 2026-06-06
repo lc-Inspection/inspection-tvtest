@@ -3916,7 +3916,157 @@ async function showInspectorDetail(inspectorName) {
   window._detApply = applyFilters;
   applyFilters();
 
-  document.getElementById('detail-modal').classList.add('open');
+  // Yeni sekmede aç
+const win = window.open('', '_blank');
+win.document.write(`<!DOCTYPE html><html lang="tr"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${inspector.ins} — Detaylı Performans</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#F4F8FF;color:#0D1B2E;padding:24px;font-size:14px}
+.header{background:linear-gradient(135deg,#0B1F3A,#1565C0);color:#fff;padding:20px 28px;border-radius:12px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:20px;font-weight:700}
+.header p{font-size:12px;opacity:.7;margin-top:4px}
+.stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:#fff;border:1px solid #DDEEFF;border-radius:10px;padding:14px;text-align:center}
+.stat-value{font-size:20px;font-weight:700;font-family:'DM Mono',monospace;line-height:1.2}
+.stat-label{font-size:9px;color:#5A7FA8;text-transform:uppercase;letter-spacing:.6px;margin-top:4px}
+.filter-bar{background:#fff;border:1px solid #DDEEFF;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.filter-bar select,.filter-bar input{padding:6px 10px;border:1px solid #CFE3F7;border-radius:7px;font-size:12px;font-family:'DM Sans',sans-serif}
+.filter-bar label{font-size:11px;color:#5A7FA8}
+.btn-reset{padding:6px 14px;border:1px solid #CFE3F7;border-radius:7px;font-size:11px;background:#fff;cursor:pointer;color:#5A7FA8}
+.filter-summary{margin-left:auto;font-size:11px;color:#5A7FA8;font-family:'DM Mono',monospace}
+.table-wrap{background:#fff;border:1px solid #DDEEFF;border-radius:10px;overflow:hidden}
+table{width:100%;border-collapse:collapse;min-width:900px}
+thead{position:sticky;top:0;z-index:10}
+th{padding:10px 12px;background:#0B1F3A;color:#fff;font-size:11px;font-weight:600;text-align:center}
+th:nth-child(2){text-align:left}
+td{padding:9px 12px;border-bottom:1px solid #EEF7FF;font-size:12px;text-align:center}
+td:nth-child(2){text-align:left;font-weight:600;color:#0B1F3A}
+.group-row{background:#0B1F3A!important;color:#fff;font-size:12px;font-weight:700;padding:8px 14px}
+.group-row td{color:#fff!important;text-align:left}
+tr:hover td{background:#F4F8FF}
+.note{margin-top:14px;padding:10px 14px;background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;font-size:10px;color:#5A7FA8;line-height:1.8}
+.perf-green{color:#00897B;font-weight:700}
+.perf-blue{color:#1565C0;font-weight:700}
+.perf-amber{color:#F57F17;font-weight:700}
+.perf-red{color:#C62828;font-weight:700}
+@media print{.filter-bar,.no-print{display:none}.header{break-after:avoid}}
+</style>
+</head><body>
+<div class="header">
+  <div>
+    <h1>📊 ${inspector.ins} — Detaylı Performans</h1>
+    <p>Klasman bazında detaylı performans analizi · ${new Date().toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'})}</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button onclick="window.print()" style="padding:8px 16px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;cursor:pointer;font-size:12px">🖨️ Yazdır</button>
+  </div>
+</div>
+<div class="stats-grid" id="stats-grid"></div>
+<div class="filter-bar no-print">
+  <label>Klasman: <select id="f-klasman" onchange="applyFilters()"><option value="">Tümü</option></select></label>
+  <label>Tarih: <select id="f-tarih" onchange="applyFilters()"><option value="">Tümü</option><option value="withdate">Tarihi Olanlar</option><option value="nodate">Tarihi Olmayanlar</option></select></label>
+  <label>Min. Adet: <input type="number" id="f-minadet" value="0" min="0" oninput="applyFilters()" style="width:60px"></label>
+  <label>Sırala: <select id="f-sort" onchange="applyFilters()"><option value="">Varsayılan</option><option value="adet-desc">Adet ↓</option><option value="adet-asc">Adet ↑</option><option value="ort-desc">Ort. Kontrol ↓</option><option value="tarih-asc">Tarihe Göre ↑</option></select></label>
+  <button class="btn-reset" onclick="resetFilters()">↺ Sıfırla</button>
+  <span class="filter-summary" id="f-summary"></span>
+</div>
+<div class="table-wrap" style="overflow-x:auto;max-height:65vh;overflow-y:auto">
+  <table><thead><tr>
+    <th>#</th><th style="text-align:left">Klasman</th><th>Adet</th>
+    <th>Kontrol Süresi<br><span style="opacity:.6;font-weight:400">(sn/adet)</span></th>
+    <th>Standart Süre</th><th>Gerçekleşen Süre</th>
+    <th>Ort. Kontrol<br><span style="opacity:.6;font-weight:400">(sn/adet)</span></th>
+    <th>Başlangıç</th><th>Bitiş</th>
+    <th>Oran<br><span style="opacity:.6;font-weight:400">(Std./Ger.)</span></th>
+  </tr></thead>
+  <tbody id="tablo-body"></tbody></table>
+</div>
+<div class="note">
+  <strong>ℹ️</strong>
+  Standart = (Kontrol Süresi × Adet) + İstasyon &nbsp;|&nbsp;
+  Gerçekleşen = Başlangıç–Bitiş farkı &nbsp;|&nbsp;
+  Ort. Kontrol = Gerçekleşen ÷ Adet &nbsp;|&nbsp;
+  Oran = Standart ÷ Gerçekleşen × 100 &nbsp;|&nbsp;
+  <span class="perf-green">✓ hedef</span> = Ort. ≤ Standart kontrol süresi
+</div>
+<script>
+const _data = ${JSON.stringify(tumKayitlar)};
+const _inspector = ${JSON.stringify({ins: inspector.ins, adet: inspector.adet, standartSure: inspector.standartSure, mesaiSure: inspector.mesaiSure, genelHizPerf: inspector.genelHizPerf, verimlilikPerf: inspector.verimlilikPerf, toplamMesaistiSaniye: inspector.toplamMesaistiSaniye})};
+const _hedef = ${Math.max(1, parseFloat(document.getElementById('inp-verimlilik')?.value) || 100)};
+
+function fmtSn(sn){if(!sn||sn<=0)return'—';const s=Math.round(sn),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=s%60;return h>0?h+'s '+String(m).padStart(2,'0')+'d':m>0?m+'d '+String(sc).padStart(2,'0')+'sn':sc+'sn'}
+function fmtTarih(d){if(!d)return'—';const dt=new Date(d);return isNaN(dt)?'—':dt.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit'})+' '+dt.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}
+function perfClass(p){return p>=100?'perf-green':p>=80?'perf-blue':p>=60?'perf-amber':'perf-red'}
+
+// Stats
+const totalAdet=_data.reduce((s,k)=>s+k.adet,0);
+const totalStd=_data.reduce((s,k)=>s+k.standartSure,0);
+const totalFiili=_data.reduce((s,k)=>s+k.kayitFiiliSure,0);
+const hamPerf=_inspector.genelHizPerf??0;
+const duzPerf=Math.round(hamPerf*(100/_hedef));
+const mesaiSure=_inspector.mesaiSure||0;
+const overtimeDk=Math.round((_inspector.toplamMesaistiSaniye||0)/60);
+document.getElementById('stats-grid').innerHTML=[
+  ['📦','TOPLAM ADET',totalAdet,''],
+  ['⏱','STANDART SÜRE',fmtSn(totalStd),''],
+  ['🕐','GERÇEKLEŞEN',totalFiili>0?fmtSn(totalFiili):'—','perf-green'],
+  ['📅','MESAİ SÜRESİ',fmtSn(mesaiSure)+(overtimeDk>0?' (+'+overtimeDk+'dk 🌙)':''),overtimeDk>0?'perf-amber':''],
+  ['📊','DÜZ. PERFORMANS',duzPerf+'%',perfClass(duzPerf)]
+].map(([ic,lb,val,cls])=>'<div class="stat-card"><div style="font-size:18px;margin-bottom:4px">'+ic+'</div><div class="stat-value '+cls+'">'+val+'</div><div class="stat-label">'+lb+'</div></div>').join('');
+
+// Klasman filtre doldur
+const klasmanlar=[...new Set(_data.map(k=>k.klasman))];
+klasmanlar.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;document.getElementById('f-klasman').appendChild(o)});
+
+function applyFilters(){
+  const kf=document.getElementById('f-klasman').value;
+  const tf=document.getElementById('f-tarih').value;
+  const mf=parseInt(document.getElementById('f-minadet').value)||0;
+  const sf=document.getElementById('f-sort').value;
+  let list=[..._data].filter(k=>{
+    if(kf&&k.klasman!==kf)return false;
+    if(mf>0&&k.adet<mf)return false;
+    if(tf==='withdate'&&!k.tarihGecerli)return false;
+    if(tf==='nodate'&&k.tarihGecerli)return false;
+    return true;
+  });
+  if(sf==='adet-desc')list.sort((a,b)=>b.adet-a.adet);
+  else if(sf==='adet-asc')list.sort((a,b)=>a.adet-b.adet);
+  else if(sf==='ort-desc')list.sort((a,b)=>(b.ortalamaKontrolSn||0)-(a.ortalamaKontrolSn||0));
+  else if(sf==='tarih-asc')list.sort((a,b)=>new Date(a.baslangic||0)-new Date(b.baslangic||0));
+  
+  const fAdet=list.reduce((s,k)=>s+k.adet,0);
+  const fStd=list.reduce((s,k)=>s+k.standartSure,0);
+  document.getElementById('f-summary').textContent=list.length+' kayıt · '+fAdet+' adet · '+fmtSn(fStd)+' standart';
+  
+  const gruplar={};
+  list.forEach(k=>{if(!gruplar[k.klasman])gruplar[k.klasman]=[];gruplar[k.klasman].push(k)});
+  let html='',idx=0;
+  Object.entries(gruplar).forEach(([kAd,kayitlar])=>{
+    const gAdet=kayitlar.reduce((s,k)=>s+k.adet,0);
+    const gStd=kayitlar.reduce((s,k)=>s+k.standartSure,0);
+    const gFiili=kayitlar.reduce((s,k)=>s+k.kayitFiiliSure,0);
+    const gOrt=gAdet>0&&gFiili>0?Math.round(gFiili/gAdet):null;
+    html+='<tr class="group-row"><td colspan="10" style="padding:8px 14px">📦 '+kAd+' &nbsp;·&nbsp; <span style="opacity:.7;font-weight:400">'+kayitlar.length+' kayıt · '+gAdet+' adet · '+fmtSn(gStd)+' standart'+(gFiili>0?' · '+fmtSn(gFiili)+' gerçekleşen':'')+(gOrt?' · <strong style="color:#FFD700">ort. '+gOrt+'sn/adet</strong>':'')+'</span></td></tr>';
+    kayitlar.forEach((k,i)=>{
+      idx++;
+      const oran=k.kayitFiiliSure&&k.standartSure?Math.round((k.standartSure/k.kayitFiiliSure)*100):null;
+      const ortSn=k.ortalamaKontrolSn;
+      const ortColor=ortSn===null?'#5A7FA8':ortSn<=k.kontrolAdetSuresi?'#00897B':ortSn<=k.kontrolAdetSuresi*1.2?'#F57F17':'#C62828';
+      const bg=i%2===0?'#F9FBFF':'#fff';
+      html+='<tr style="background:'+bg+'"><td style="color:#5A7FA8;font-family:monospace">'+idx+'</td><td>'+k.klasman+'</td><td style="font-weight:700;font-size:14px">'+k.adet+'</td><td style="color:#1565C0;font-family:monospace">'+k.kontrolAdetSuresi+'sn</td><td style="text-align:right;font-family:monospace"><span style="color:#1565C0">'+fmtSn(k.kontrolAdetSuresi*k.adet)+'</span>'+(k.istasyonSuresi>0?'<div style="font-size:10px;color:#5A7FA8">+ '+fmtSn(k.istasyonSuresi)+' istasyon</div>':'')+'<div style="font-weight:700">'+fmtSn(k.standartSure)+'</div></td><td style="font-family:monospace;color:'+(k.kayitFiiliSure>0?'#00897B':'#5A7FA8')+'">'+fmtSn(k.kayitFiiliSure)+'</td><td style="font-family:monospace;font-weight:700;color:'+ortColor+'">'+(ortSn!==null?ortSn+'sn':'—')+(ortSn!==null?'<div style="font-size:9px;font-weight:400">'+( ortSn<=k.kontrolAdetSuresi?'✓ hedef':'↑ hedefin üstü')+'</div>':'<div style="font-size:9px;color:#5A7FA8">tarih yok</div>')+'</td><td style="font-size:11px;color:#5A7FA8">'+(k.tarihGecerli&&k.baslangic?fmtTarih(k.baslangic):'—')+'</td><td style="font-size:11px;color:#5A7FA8">'+(k.tarihGecerli&&k.bitis?fmtTarih(k.bitis):'—')+'</td><td style="font-family:monospace;font-weight:700">'+(oran!==null?'<span class="'+perfClass(oran)+'">'+oran+'%</span><div style="font-size:9px;font-weight:400">'+( oran>=100?'✓ hedef içi':'↓ hedef altı')+'</div>':'<span style="color:#5A7FA8">—</span>')+'</td></tr>';
+    });
+  });
+  document.getElementById('tablo-body').innerHTML=html||'<tr><td colspan="10" style="padding:24px;text-align:center;color:#5A7FA8">Filtreye uyan kayıt bulunamadı.</td></tr>';
+}
+function resetFilters(){document.getElementById('f-klasman').value='';document.getElementById('f-tarih').value='';document.getElementById('f-minadet').value=0;document.getElementById('f-sort').value='';applyFilters()}
+applyFilters();
+<\/script></body></html>`);
+win.document.close();
 }
 
 function closeDetailModal() {
