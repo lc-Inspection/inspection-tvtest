@@ -2544,10 +2544,9 @@ const listeTemiz = liste.map(inspector => {
 // ─────────────────────────────────────────────
 async function pushInspectorKayitlarToSheets(liste, url, token) {
   if (!url || !token || !liste || !liste.length) return;
-  // Her inspector sırayla gönderilir (no-cors — yanıt okunamaz ama veri gider)
+  let gonderilen = 0;
   for (const inspector of liste) {
     try {
-      // klasmanlar içindeki kayitlar'ı gönder (tarihler JSON string olarak gider)
       const kayitlar = {};
       Object.entries(inspector.klasmanlar || {}).forEach(([k, v]) => {
         if (Array.isArray(v.kayitlar) && v.kayitlar.length > 0) {
@@ -2564,6 +2563,9 @@ async function pushInspectorKayitlarToSheets(liste, url, token) {
         }
       });
 
+      // Kayıt yoksa bu inspector'ı atla — gereksiz istek gönderme
+      if (Object.keys(kayitlar).length === 0) continue;
+
       await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
@@ -2575,13 +2577,18 @@ async function pushInspectorKayitlarToSheets(liste, url, token) {
         }),
         mode: 'no-cors'
       });
+
+      gonderilen++;
+
+      // Google Apps Script rate limit aşımını önlemek için 300ms bekle
+      await new Promise(r => setTimeout(r, 300));
+
     } catch(err) {
       console.warn('Inspector kayıt push hatası (' + inspector.ins + '):', err.message);
     }
   }
-  console.log('✅ Inspector kayıtları Sheets\'e gönderildi:', liste.length, 'inspector');
+  console.log('✅ Inspector kayıtları Sheets\'e gönderildi:', gonderilen, '/', liste.length, 'inspector');
 }
-
 // ─────────────────────────────────────────────
 // PERFORMANS VERİSİNİ SHEETS'TEN ÇEK
 // Dashboard "📥 Sheets'ten Çek" butonu + otomatik açılış
