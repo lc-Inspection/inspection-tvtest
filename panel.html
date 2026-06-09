@@ -1719,7 +1719,7 @@ let animationEffect = 'slide'; // slide, fade, zoom, flip
 // APP CONFIG (Tüm Ayarlar)
 // ────────────────────────────
 const APP_CONFIG_KEY = 'lc_inspection_config';
-const DEFAULT_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzoLa8XG0hgJwOXySUY9O0QG3Adlt5fRHHInjbUVn6e1wDVmHiH5cwsm-jBiwzAKfYa/exec';
+const DEFAULT_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzv8NKeutlSKGTB59-jWHm4bdeHOuPH7nIsz6rmklL6iYiiKl15gTgjxtfZzfsXJ9vlkg/exec';
 const DEFAULT_API_TOKEN  = 'lcw-secret-2024';
 let appConfig = {
   password: '',          // Panel giriş şifresi — Sheets Config'ten yüklenir, kodda saklanmaz
@@ -7347,7 +7347,7 @@ async function pullKlasmanAnalizFromSheets() {
                 <span style="color:#E65100;font-weight:600;">⚠️ Anahtarınızı başkalarıyla paylaşmayın.</span></div>
               <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:11px;color:#795548;display:flex;align-items:flex-start;gap:8px;">
                 <span style="font-size:14px;flex-shrink:0;">🛡️</span>
-                <span><strong>Güvenlik Uyarısı:</strong> API anahtarınız yalnızca bu sayfada kullanılır ve tarayıcı localStorage'ında saklanır.</span>
+                <span><strong>Güvenlik Uyarısı:</strong> API anahtarınız Google Sheets Config sekmesine kaydedilir ve tüm cihazlarda otomatik senkronize edilir.</span>
               </div>
               <!-- Model Seçici -->
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:#EEF7FF;border:1px solid #BBDEFB;border-radius:8px;">
@@ -7528,11 +7528,20 @@ function openAnalizOverlay(inspData, inspObj, hedef) {
   document.getElementById('ao-f-minadet').value  = 0;
   document.getElementById('ao-f-sort').value     = '';
 
-  // Gemini kayıtlı key yükle
+  // Gemini kayıtlı key yükle — önce localStorage, sonra Sheets'ten senkronize et
   try {
     var savedKey = localStorage.getItem(AO_LS_KEY) || '';
-    if (savedKey) document.getElementById('ao-gkey').value = savedKey;
+    if (savedKey) {
+      document.getElementById('ao-gkey').value = savedKey;
+    }
   } catch(e) {}
+  // Her açılışta Sheets'ten güncel key'i çek (tüm cihazlarda senkronize olsun)
+  pullConfigFromSheets().then(function() {
+    try {
+      var freshKey = localStorage.getItem(AO_LS_KEY) || '';
+      if (freshKey) document.getElementById('ao-gkey').value = freshKey;
+    } catch(e) {}
+  }).catch(function(){});
 
   // Sonuçları sıfırla
   document.getElementById('ao-gresult').style.display  = 'none';
