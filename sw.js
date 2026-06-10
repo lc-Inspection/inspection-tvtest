@@ -1,8 +1,10 @@
 // Inspection Performans Paneli — Service Worker v2
-// Bu dosyayı panel.html ile aynı dizine koy: /inspection-panel/sw.js
+// Bu dosyayı Panel_v16_pwa.html ile AYNI KLASÖRE koy
 
-const CACHE_NAME = 'inspection-panel-v2';
-const PAGE_URL   = './panel.html';
+const CACHE_NAME = 'ip-v2';
+
+// HTML dosyanın adı neyse onu yaz (büyük/küçük harf önemli)
+const PAGE_URL = './Panel_v16_pwa.html';
 
 self.addEventListener('install', function(e) {
   e.waitUntil(
