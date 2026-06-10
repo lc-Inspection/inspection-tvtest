@@ -21,14 +21,26 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 
-  /* Analiz Overlay Tablosu satır çizgileri */
+/* Analiz Overlay Tablosu satır çizgileri */
 #ao-tablo-body tr {
   border-bottom: 1px solid #E8F2FD;
 }
 
+/* Hover efekti */
 #ao-tablo-body tr:hover {
   background-color: #F9FBFF;
 }
+
+/* Çift satırlar beyaz */
+#ao-tablo-body tr:nth-child(even) {
+  background-color: #FFFFFF;
+}
+
+/* Tek satırlar açık gri */
+#ao-tablo-body tr:nth-child(odd) {
+  background-color: #F7F7F7;
+}
+
 :root {
   --navy:    #0B1F3A;
   --navy2:   #102848;
