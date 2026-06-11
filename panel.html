@@ -9020,6 +9020,8 @@ function aoApplyFilters() {
     kayitlar.forEach(function(k, i) {
       idx++;
       var oran    = k.kayitFiiliSure && k.standartSure ? Math.round((k.standartSure / k.kayitFiiliSure) * 100) : null;
+      // 15 adet ve altında gerçekleşen < standart ise oran maksimum %100
+      if (oran !== null && k.adet <= 15 && k.kayitFiiliSure < k.standartSure) oran = Math.min(oran, 100);
       var ortSn   = k.ortalamaKontrolSn;
       var ortColor = ortSn === null ? '#5A7FA8' : (k.kontrolAdetSuresi <= 0 || ortSn <= k.kontrolAdetSuresi) ? '#00897B' : ortSn <= k.kontrolAdetSuresi * 1.2 ? '#F57F17' : '#C62828';
       var bg = i % 2 === 0 ? '#F9FBFF' : '#fff';
