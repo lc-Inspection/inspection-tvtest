@@ -7074,7 +7074,7 @@ function renderTopInspectors() {
           <div class="top-inspector-info-text" style="flex:1;min-width:0">
             <div class="top-inspector-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${inspector.ins}</div>
             <div class="top-inspector-details">
-              ${inspector.adet || 0} ${t.units_short} · ${inspector.gunSayisi || 0} ${t.working}
+              ${(inspector.adet || 0).toLocaleString('tr-TR')} ${t.units_short} · ${inspector.gunSayisi || 0} ${t.working}
             </div>
             <span class="top-inspector-badge ${performanceLevel.cls}" style="margin-top:4px;display:inline-block">${performanceLevel.text}</span>
           </div>
@@ -7154,7 +7154,7 @@ function showSlide(index) {
     const barW = Math.min(100, kPerf);
     return `<div class="slide-klasman-row">
       <span class="slide-klasman-name">${kName}</span>
-      <span class="slide-klasman-adet">${kData.adet || 0} ${(translations[currentLang]||translations.tr).units_short}</span>
+      <span class="slide-klasman-adet">${(kData.adet || 0).toLocaleString('tr-TR')} ${(translations[currentLang]||translations.tr).units_short}</span>
       <div class="slide-klasman-bar"><div class="slide-klasman-bar-fill" style="width:${barW}%;background:${kColor}"></div></div>
       <span class="slide-klasman-perf" style="color:${kColor}">${kPerf}%</span>
     </div>`;
@@ -7189,11 +7189,11 @@ function showSlide(index) {
         <!-- Orta: İstatistikler -->
         <div class="inspector-slide-info">
           <div class="inspector-slide-stat">
-            <div class="inspector-slide-stat-value">${inspector.adet || 0}</div>
+            <div class="inspector-slide-stat-value">${(inspector.adet || 0).toLocaleString('tr-TR')}</div>
             <div class="inspector-slide-stat-label">${(translations[currentLang]||translations.tr).total_product}</div>
           </div>
           <div class="inspector-slide-stat">
-            <div class="inspector-slide-stat-value">${inspector.kayit || 0}</div>
+            <div class="inspector-slide-stat-value">${(inspector.kayit || 0).toLocaleString('tr-TR')}</div>
             <div class="inspector-slide-stat-label">${(translations[currentLang]||translations.tr).record_count}</div>
           </div>
           <div class="inspector-slide-stat">
