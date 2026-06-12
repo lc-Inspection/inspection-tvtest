@@ -1166,6 +1166,10 @@ label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; 
     <div class="pw-title" id="pw-title" data-i18n="login_title">Giriş Yap</div>
     <div class="pw-sub" id="pw-sub" data-i18n="login_sub">Şifrenizi girerek devam edin</div>
     <input type="password" class="pw-input" id="pw-input" data-i18n-placeholder="password_placeholder" placeholder="••••••" onkeydown="if(event.key==='Enter')checkPassword()">
+   <label style="display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:10px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none">
+  <input type="checkbox" id="pw-remember" checked style="width:15px;height:15px;margin:0;cursor:pointer;accent-color:var(--blue2)">
+  Bu cihazda beni hatırla
+</label>
     <div class="pw-err" id="pw-err"></div>
     <button class="pw-btn" onclick="checkPassword()" data-i18n="login_btn">🔓 Giriş Yap</button>
     <div style="margin-top:10px;font-size:11px;color:var(--muted2);display:flex;align-items:center;justify-content:center;gap:6px" id="pw-server-status">
@@ -2985,14 +2989,48 @@ let _pwMandatory = false;
 // Sayfa ilk açılışında şifre sor (henüz unlock olmadıysa)
 function initPasswordGate() {
   if (!klasmanUnlocked) {
-    // App shell gizli kalır — sadece login overlay görünür
+    let remembered = null;
+    try { remembered = localStorage.getItem('lc_remembered_pw'); } catch(e) {}
+
+    if (remembered) {
+      klasmanUnlocked = true;
+      sessionStorage.setItem(SESSION_KEY, '1');
+      const shell = document.getElementById('app-shell');
+      if (shell) shell.style.display = 'block';
+      setTimeout(() => autoFetchOnStartup(), 600);
+      _verifyRememberedPwInBackground(remembered);
+      return;
+    }
+
     document.getElementById('pw-overlay').style.display = 'flex';
   } else {
-    // Session açık — app shell'i göster, sync yap
     const shell = document.getElementById('app-shell');
     if (shell) shell.style.display = 'block';
     setTimeout(() => autoFetchOnStartup(), 600);
   }
+}
+
+async function _verifyRememberedPwInBackground(remembered) {
+  const url = appConfig.sheetsWebAppUrl;
+  const token = appConfig.sheetsApiToken;
+  if (!url || !token) return;
+  try {
+    const data = await jsonpFetch(url, { action: 'getConfig', token });
+    if (data.status === 'ok' && data.config && data.config.password) {
+      appConfig.password = data.config.password;
+      if (data.config.klasmanPassword) appConfig.klasmanPassword = data.config.klasmanPassword;
+      localStorage.setItem(APP_CONFIG_KEY, JSON.stringify(appConfig));
+
+      if (remembered !== data.config.password) {
+        localStorage.removeItem('lc_remembered_pw');
+        klasmanUnlocked = false;
+        sessionStorage.removeItem(SESSION_KEY);
+        document.getElementById('app-shell').style.display = 'none';
+        document.getElementById('pw-overlay').style.display = 'flex';
+        document.getElementById('pw-err').textContent = '⚠️ Şifre değişti, lütfen yeni şifre ile giriş yapın';
+      }
+    }
+  } catch(e) {}
 }
 
 function requirePassword(navEl) {
@@ -3149,6 +3187,11 @@ async function checkPassword() {
   function _unlock() {
     klasmanUnlocked = true;
     sessionStorage.setItem(SESSION_KEY, '1');
+    try {
+      const rem = document.getElementById('pw-remember');
+      if (rem && rem.checked) localStorage.setItem('lc_remembered_pw', val);
+      else localStorage.removeItem('lc_remembered_pw');
+    } catch(e) {}
     if (dotEl)   dotEl.style.background = 'var(--green)';
     if (labelEl) labelEl.textContent = (translations[currentLang]||translations.tr).verified;
     const shell = document.getElementById('app-shell');
