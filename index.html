@@ -116,12 +116,14 @@
 
   async function checkScreenStatus() {
     let deviceId = localStorage.getItem("device_id");
+    let pinKodu = localStorage.getItem("pin_kodu");
 
     // Cihaz ilk kez açılıyorsa sunucudan PIN iste
     if (!deviceId) {
       try {
         let data = await jsonpRequest(`${API_URL}?action=get-pin`);
         localStorage.setItem("device_id", data.device_id);
+        localStorage.setItem("pin_kodu", data.pin_kodu);
         document.getElementById("pin-text").innerText = data.pin_kodu;
       } catch (err) {
         document.getElementById("pin-text").innerText = "Bağlantı hatası";
@@ -159,7 +161,7 @@
         // Henüz video atanmamışsa PIN'i göstermeye devam et
         document.getElementById("video-alani").style.display = "flex";
         document.getElementById("my-video").style.display = "none";
-        document.getElementById("pin-text").innerText = "Eşleşme bekleniyor...";
+        document.getElementById("pin-text").innerText = pinKodu || "...";
       }
     } catch (err) {
       console.error("Durum kontrolü hatası (muhtemelen internet yok, önbellekteki video oynamaya devam eder):", err);
